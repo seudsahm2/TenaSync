@@ -218,8 +218,8 @@ app.post('/api/maternal/dispatch', async (req, res) => {
 });
 
 // Start bot and express server
-app.listen(config.PORT, 'localhost', async () => {
-  console.log(`🚀 TenaSync Express Server running on http://localhost:${config.PORT}`);
+app.listen(config.PORT, '0.0.0.0', async () => {
+  console.log(`🚀 TenaSync Express Server running on port ${config.PORT}`);
 
   // Launch Telegraf Bot via Polling in Dev
   bot.telegram.deleteWebhook({ drop_pending_updates: true })
