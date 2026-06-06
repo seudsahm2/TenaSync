@@ -23,7 +23,7 @@ if (config.GEMINI_API_KEY) {
 }
 
 // ── Unified LLM caller ───────────────────────────────────────────────────────
-async function callLLM(prompt: string): Promise<string> {
+export async function callLLM(prompt: string): Promise<string> {
   if (groqClient) {
     try {
       const chat = await groqClient.chat.completions.create({

@@ -17,6 +17,13 @@ import {
 
 const prisma = new PrismaClient();
 
+export interface AvailabilityRequest {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    isAvailable: boolean;
+}
+
 export class DoctorService {
 
     // ==================== PROFILE MANAGEMENT ====================
@@ -485,6 +492,56 @@ export class DoctorService {
             createdAt: updated.createdAt,
             updatedAt: updated.updatedAt
         };
+    }
+
+    // ==================== AVAILABILITY MANAGEMENT ====================
+
+    /**
+     * Add or update an availability slot
+     */
+    async setAvailability(
+        doctorId: string,
+        data: AvailabilityRequest
+    ): Promise<any> {
+        // @ts-ignore
+        return await prisma.doctorAvailability.create({
+            data: {
+                clinicianId: doctorId,
+                dayOfWeek: data.dayOfWeek,
+                startTime: data.startTime,
+                endTime: data.endTime,
+                isAvailable: data.isAvailable
+            }
+        });
+    }
+
+    /**
+     * Get doctor's availability
+     */
+    async getAvailability(doctorId: string): Promise<any[]> {
+        // @ts-ignore
+        return await prisma.doctorAvailability.findMany({
+            where: { clinicianId: doctorId },
+            orderBy: { dayOfWeek: 'asc' }
+        });
+    }
+
+    /**
+     * Delete an availability slot
+     */
+    async deleteAvailability(doctorId: string, slotId: string): Promise<boolean> {
+        try {
+            // @ts-ignore
+            await prisma.doctorAvailability.delete({
+                where: {
+                    id: slotId,
+                    clinicianId: doctorId
+                }
+            });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // ==================== DOCUMENT MANAGEMENT ====================

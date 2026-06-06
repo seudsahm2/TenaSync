@@ -245,6 +245,61 @@ router.put('/consultations/:sessionId/status', async (req, res) => {
   }
 });
 
+// ==================== AVAILABILITY ROUTES ====================
+
+// Set availability slot
+router.post('/availability', async (req, res) => {
+  try {
+    const doctorId = (req as any).user?.id;
+    if (!doctorId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { dayOfWeek, startTime, endTime, isAvailable } = req.body;
+    if (dayOfWeek === undefined || !startTime || !endTime) {
+      return res.status(400).json({ error: 'Missing required availability fields' });
+    }
+
+    const slot = await doctorService.setAvailability(doctorId, {
+      dayOfWeek,
+      startTime,
+      endTime,
+      isAvailable: isAvailable !== undefined ? isAvailable : true
+    });
+    res.status(201).json(slot);
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// Get availability slots
+router.get('/availability/:doctorId', async (req, res) => {
+  try {
+    const slots = await doctorService.getAvailability(req.params.doctorId);
+    res.json(slots);
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// Delete availability slot
+router.delete('/availability/:slotId', async (req, res) => {
+  try {
+    const doctorId = (req as any).user?.id;
+    if (!doctorId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const success = await doctorService.deleteAvailability(doctorId, req.params.slotId);
+    if (!success) {
+      return res.status(404).json({ error: 'Slot not found or unauthorized' });
+    }
+    res.json({ success: true, message: 'Slot deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
 // ==================== DOCUMENT ROUTES ====================
 
 // List documents

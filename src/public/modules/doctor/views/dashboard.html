@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Doctor Dashboard - TenaSync</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="doctor-layout">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>🩺 TenaSync</h2>
+                <p>Doctor Portal</p>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-view="dashboard">Dashboard</li>
+                <li class="nav-item" data-view="patients">Patients</li>
+                <li class="nav-item" data-view="consultations">Consultations</li>
+                <li class="nav-item" data-view="documents">Documents & Guidelines</li>
+            </ul>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <div class="topbar">
+                <h3 id="view-title">Dashboard</h3>
+                <div>
+                    <span id="doctor-name">Loading Profile...</span>
+                    <input type="text" id="mock-doctor-id" placeholder="Mock Doctor ID for Testing" style="margin-left:15px; padding: 5px;">
+                    <button class="btn" id="btn-login">Login</button>
+                </div>
+            </div>
+            
+            <div class="content-area" id="content-area">
+                <!-- Views will be injected here via app.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- View Templates -->
+    <template id="tpl-dashboard">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3 id="stat-patients">0</h3>
+                <p>Total Patients</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="stat-active-consultations">0</h3>
+                <p>Active Consultations</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="stat-total-consultations">0</h3>
+                <p>Total Consultations Completed</p>
+            </div>
+        </div>
+        <div class="card" style="margin-top:20px;">
+            <h3>Profile Settings</h3>
+            <p>Specialty: <strong id="profile-specialty">None</strong></p>
+            <p>Verified: <strong id="profile-verified">No</strong></p>
+            <p>Treatment Options: <strong id="profile-treatments">None</strong></p>
+            
+            <hr style="margin:20px 0; border: 1px solid #eee;">
+            
+            <h4>Manage Availability</h4>
+            <div style="display:flex; gap: 10px; margin-bottom:15px;">
+                <select id="avail-day">
+                    <option value="1">Monday</option>
+                    <option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option>
+                    <option value="4">Thursday</option>
+                    <option value="5">Friday</option>
+                    <option value="6">Saturday</option>
+                    <option value="0">Sunday</option>
+                </select>
+                <input type="time" id="avail-start" value="09:00">
+                <input type="time" id="avail-end" value="17:00">
+                <button class="btn btn-success" id="btn-add-avail">Add Slot</button>
+            </div>
+            <ul id="availability-list"></ul>
+        </div>
+    </template>
+
+    <template id="tpl-patients">
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Telegram ID</th>
+                        <th>Last Consultation</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="patient-list">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <template id="tpl-consultations">
+        <div class="consultation-workspace">
+            <div class="consultation-list" id="consultation-list">
+                <!-- Chat list here -->
+            </div>
+            <div class="chat-area" id="chat-area" style="display: none;">
+                <div class="chat-header">
+                    <div>
+                        <h3 id="chat-patient-name" style="margin:0;">Select a patient</h3>
+                        <p id="chat-status" style="margin:0; font-size:0.8em; color:gray;">Status: Active</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-danger" id="btn-takeover">Manual Takeover (Disable AI)</button>
+                    </div>
+                </div>
+                
+                <div class="chat-history" id="chat-history" style="display: flex; flex-direction: column;">
+                    <div class="ai-summary-box" id="ai-summary-box" style="display:none;">
+                        <strong>🤖 AI Patient Summary:</strong>
+                        <p id="ai-summary-text" style="white-space: pre-wrap; font-size: 0.9em;"></p>
+                    </div>
+                    <!-- Messages go here -->
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="chat-input-text" placeholder="Type a message to the patient...">
+                    <button class="btn btn-success" id="btn-send-message">Send</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-documents">
+        <div class="card">
+            <h3>Upload Medical Guidelines</h3>
+            <p>Upload reference guidelines that the AI Assistant will use to answer patient questions.</p>
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="doc-title" placeholder="Document Title" style="padding:8px; margin-right:10px;">
+                <textarea id="doc-content" placeholder="Paste guidelines text here..." style="padding:8px; width:100%; height:100px; margin-top:10px; display:block; margin-bottom:10px;"></textarea>
+                <button class="btn btn-success" id="btn-upload-doc">Upload Guideline</button>
+            </div>
+            <hr>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="document-list">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <script src="../app.js"></script>
+</body>
+</html>

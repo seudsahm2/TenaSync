@@ -45,6 +45,7 @@ model User {
   patientConsultations ConsultationSession[] @relation("PatientRelation")
   clinicianConsultations ConsultationSession[] @relation("ClinicianRelation")
   documents            ClinicianDocument[] // Clinician knowledge books/guidelines
+  availabilities       DoctorAvailability[] @relation("ClinicianAvailability")
   
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
@@ -59,6 +60,18 @@ model ClinicianDocument {
   createdAt DateTime @default(now())
 }
 
+model DoctorAvailability {
+  id          String   @id @default(uuid())
+  clinicianId String
+  user        User     @relation("ClinicianAvailability", fields: [clinicianId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int      // 0 = Sunday, 1 = Monday, etc.
+  startTime   String   // "09:00"
+  endTime     String   // "17:00"
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model ConsultationSession {
   id                    String              @id @default(uuid())
   sessionId             String              @unique
@@ -68,6 +81,7 @@ model ConsultationSession {
   
   status                ConsultationStatus  @default(ACTIVE)
   autoReplyEnabled      Boolean             @default(true)      // Auto-reply/consultation mode flag
+  aiSummary             String?             // AI Generated Patient Summary
   
   // Relational Foreign Keys
   patientId             String
