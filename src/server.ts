@@ -5,13 +5,19 @@ import { config } from './config/index.js';
 import { prisma } from './core/db/index.js';
 import { bot } from './bot/index.js';
 
+// Import distributed modules
+import patientRoutes from './modules/patient/routes.js';
+import doctorRoutes from './modules/doctor/routes.js';
+import aiAssistantRoutes from './modules/ai_assistant/routes.js';
+import linguisticsRoutes from './modules/linguistics/routes.js';
+import specializedRoutes from './modules/specialized/routes.js';
+
 // Resolve dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
-
 // Global BigInt serializer override for JSON responses
 app.set('json replacer', (key: string, value: any) => {
   return typeof value === 'bigint' ? value.toString() : value;
@@ -19,6 +25,13 @@ app.set('json replacer', (key: string, value: any) => {
 
 // Serve TMA static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Mount distributed modules
+app.use('/api/patient', patientRoutes);            // Eyob's module
+app.use('/api/doctor', doctorRoutes);              // Seud's module
+app.use('/api/ai', aiAssistantRoutes);             // Ermiyas's module
+app.use('/api/linguistics', linguisticsRoutes);    // Yabsira's module
+app.use('/api/specialized', specializedRoutes);    // Tigistu's module
 
 /**
  * API: Match clinicians based on patient symptoms
