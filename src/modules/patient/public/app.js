@@ -10,7 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Parse user_id from Telegram URL parameters if available
   const urlParams = new URLSearchParams(window.location.search);
-  const tgUserId = urlParams.get('user_id');
+  let tgUserId = urlParams.get('user_id');
+
+  // Try to use secure Telegram WebApp SDK if available
+  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+    tgUserId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+  }
+
   if (tgUserId) {
     document.getElementById('login-telegram-id').value = tgUserId;
   }
@@ -99,16 +105,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── LOGIN / ACCOUNT CONNECTION ─────────────────────────────────
   const btnLoginSubmit = document.getElementById('btn-login-submit');
-  btnLoginSubmit.addEventListener('click', async () => {
-    const tgIdInput = document.getElementById('login-telegram-id').value.trim();
+  
+  async function connectAccount(tgIdInput) {
     if (!tgIdInput) {
       showAlert('Error', 'Please enter a valid Telegram User ID.', '❌');
       return;
     }
 
     activeUserId = tgIdInput;
-    btnLoginSubmit.disabled = true;
-    btnLoginSubmit.textContent = 'Connecting...';
+    if (btnLoginSubmit) {
+      btnLoginSubmit.disabled = true;
+      btnLoginSubmit.textContent = 'Connecting...';
+    }
 
     try {
       // Fetch/Create Profile
@@ -125,10 +133,21 @@ document.addEventListener('DOMContentLoaded', () => {
       setupLocalBackupData();
       showView('dashboard');
     } finally {
-      btnLoginSubmit.disabled = false;
-      btnLoginSubmit.textContent = 'Connect Account';
+      if (btnLoginSubmit) {
+        btnLoginSubmit.disabled = false;
+        btnLoginSubmit.textContent = 'Connect Account';
+      }
     }
+  }
+
+  btnLoginSubmit.addEventListener('click', () => {
+    connectAccount(document.getElementById('login-telegram-id').value.trim());
   });
+
+  // Auto-connect if user ID is found securely via Telegram
+  if (tgUserId) {
+    connectAccount(tgUserId);
+  }
 
   // ─── PROFILE LOGIC ──────────────────────────────────────────────
   async function fetchProfile() {
@@ -260,13 +279,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Link to specialized sub-modules (Spine, Maternal, Nutrition)
   document.getElementById('action-open-spine').addEventListener('click', () => {
-    window.location.href = `../../index.html?autostart=spine&user_id=${activeUserId}`;
+    window.location.href = `/modules/specialized/index.html?tab=spine`;
   });
   document.getElementById('action-open-maternal').addEventListener('click', () => {
-    window.location.href = `../../index.html?autostart=maternal&user_id=${activeUserId}`;
+    window.location.href = `/modules/specialized/index.html?tab=maternal`;
   });
   document.getElementById('action-open-nutrition').addEventListener('click', () => {
-    window.location.href = `../../index.html?autostart=nutrition&user_id=${activeUserId}`;
+    window.location.href = `/modules/specialized/index.html?tab=nutrition`;
   });
 
   // ─── AI CHAT LOGIC ──────────────────────────────────────────────
@@ -634,6 +653,30 @@ document.addEventListener('DOMContentLoaded', () => {
     activeUserId = null;
     document.querySelector('.tab-navigation').style.display = 'none';
     showView('login');
+  });
+
+  document.getElementById('btn-become-doctor')?.addEventListener('click', async () => {
+    if (!activeUserId) return;
+    
+    // Call the doctor verification endpoint to upgrade role
+    try {
+      const res = await fetch(`/api/doctor/verify/${profileData.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          specialty: 'General Practitioner',
+          treatmentOptions: ['Telehealth', 'Clinic Visit']
+        })
+      });
+
+      if (res.ok) {
+        showAlert('Upgraded to Clinician!', 'Your account has been upgraded. You can now access the Doctor Portal.', '👨‍⚕️');
+      } else {
+        showAlert('Upgrade Failed', 'Could not process clinician upgrade.', '❌');
+      }
+    } catch (e) {
+      showAlert('Error', 'Could not reach server.', '⚠️');
+    }
   });
 
   // ─── SYSTEM ALERTS & NOTIFICATIONS CENTER ───────────────────────

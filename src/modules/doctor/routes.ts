@@ -28,6 +28,25 @@ router.use(mockAuth);
 
 // ==================== PROFILE ROUTES ====================
 
+// Get doctor by Telegram ID (for real login)
+router.get('/telegram/:tgId', async (req, res) => {
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const doctor = await prisma.user.findUnique({
+      where: { telegramId: BigInt(req.params.tgId) }
+    });
+    
+    if (!doctor || doctor.role !== 'CLINICIAN') {
+      return res.status(404).json({ error: 'Doctor not found or not verified' });
+    }
+    
+    res.json({ id: doctor.id });
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
 // Get doctor profile
 router.get('/profile/:id', async (req, res) => {
   try {

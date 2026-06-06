@@ -8,7 +8,40 @@ class DoctorDashboard {
     
     this.initElements();
     this.bindEvents();
-    
+    this.autoLoginWithTelegram();
+  }
+
+  async autoLoginWithTelegram() {
+    // Check if running inside Telegram Web App
+    let tgUserId = null;
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+      tgUserId = window.Telegram.WebApp.initDataUnsafe.user.id;
+    } else {
+      // Fallback to URL params
+      const urlParams = new URLSearchParams(window.location.search);
+      tgUserId = urlParams.get('user_id');
+    }
+
+    if (tgUserId) {
+      try {
+        const res = await fetch(`/api/doctor/telegram/${tgUserId}`);
+        if (res.ok) {
+          const data = await res.json();
+          this.doctorId = data.id;
+          localStorage.setItem('mockDoctorId', this.doctorId);
+          this.mockDoctorIdInput.value = this.doctorId;
+          this.loadProfile();
+          this.switchView('dashboard');
+          return;
+        } else {
+          alert('Your account is not verified as a Doctor. Please return to the Patient portal to upgrade.');
+        }
+      } catch (e) {
+        console.error('Auto login failed', e);
+      }
+    }
+
+    // If auto-login fails, check if we had a saved one
     if (this.doctorId) {
       this.mockDoctorIdInput.value = this.doctorId;
       this.loadProfile();

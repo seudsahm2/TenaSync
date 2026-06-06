@@ -31,6 +31,13 @@ app.get('/', (req, res) => {
 // Serve TMA static files AFTER custom routes so our redirect takes priority over index.html static serving
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve module-specific frontends directly from their modular folders
+app.use('/modules/patient', express.static(path.join(__dirname, 'modules/patient/public')));
+app.use('/modules/doctor', express.static(path.join(__dirname, 'modules/doctor/public')));
+app.use('/modules/ai_assistant', express.static(path.join(__dirname, 'modules/ai_assistant/public')));
+app.use('/modules/linguistics', express.static(path.join(__dirname, 'modules/linguistics/public')));
+app.use('/modules/specialized', express.static(path.join(__dirname, 'modules/specialized/public')));
+
 // Mount distributed modules
 app.use('/api/patient', patientRoutes);            // Eyob's module
 app.use('/api/doctor', doctorRoutes);              // Seud's module
