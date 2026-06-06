@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { AIAssistantController } from './controller.js';
 
 const router = Router();
@@ -9,5 +9,9 @@ const router = Router();
 router.post('/analyze', AIAssistantController.analyzeSymptoms);
 router.post('/summary', AIAssistantController.generateSummary);
 router.post('/specialists', AIAssistantController.getSpecialists);
+
+router.get('/ping', (req: Request, res: Response) => {
+  res.json({ message: 'AI Assistant module is working' });
+});
 
 export default router;

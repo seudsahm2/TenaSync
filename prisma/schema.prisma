@@ -47,8 +47,62 @@ model User {
   documents            ClinicianDocument[] // Clinician knowledge books/guidelines
   availabilities       DoctorAvailability[] @relation("ClinicianAvailability")
   
+  // Patient Profile & Recovery Relations
+  patientProfile       PatientProfile?
+  recoveryLogs         RecoveryLog[]
+  
+  // Specialized Domain
+  specializedProfile   SpecializedProfile?
+
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+}
+
+model PatientProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Demographics
+  fullName           String?
+  age                Int?
+  gender             String?
+  phoneNumber        String?
+  preferredLanguage  String   @default("English")
+  location           String?
+  emergencyContact   String?
+  
+  // Lifestyle Info
+  occupation         String?
+  activityLevel      String?
+  workStyle          String?
+  
+  // Medical Info
+  existingConditions String?
+  allergies          String?
+  currentMedications String?
+  previousInjuries   String?
+  
+  // Privacy Options
+  anonymousMode      Boolean  @default(false)
+  womensPrivacyMode  Boolean  @default(false)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model RecoveryLog {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  painLevel          Int      // 0 to 10
+  energyLevel        String   // "Low", "Medium", "High"
+  mobility           String   // "Improving", "No Change", "Worsening"
+  exerciseCompleted  Boolean  @default(false)
+  notes              String?
+  
+  createdAt          DateTime @default(now())
 }
 
 model ClinicianDocument {
@@ -103,4 +157,63 @@ model ConsultationMessage {
   text                  String
   telegramMessageId     Int?
   createdAt             DateTime            @default(now())
+}
+
+model SpecializedProfile {
+  id             String            @id @default(uuid())
+  userId         String            @unique
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  spineActive    Boolean           @default(false)
+  maternalActive Boolean           @default(false)
+  nutritionActive Boolean          @default(false)
+
+  spineAssessments SpineAssessment[]
+  maternalLogs     MaternalLog[]
+  nutritionPlans   NutritionPlan[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model SpineAssessment {
+  id             String            @id @default(uuid())
+  profileId      String
+  profile        SpecializedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  painLevel      Int               // 1-10
+  hoursSeated    Int               
+  postureScore   Float?
+  assessmentDate DateTime          @default(now())
+  notes          String?
+
+  createdAt      DateTime          @default(now())
+}
+
+model MaternalLog {
+  id             String            @id @default(uuid())
+  profileId      String
+  profile        SpecializedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  postpartumWeek Int
+  painLevel      Int               // 1-10
+  mood           String?           // e.g., "Good", "Anxious", "Depressed"
+  pelvicRecovery String?           // e.g., "Improving", "Painful"
+  logDate        DateTime          @default(now())
+
+  createdAt      DateTime          @default(now())
+}
+
+model NutritionPlan {
+  id             String            @id @default(uuid())
+  profileId      String
+  profile        SpecializedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  dietaryGoals   String[]
+  assignedMeals  String[]          // e.g., ["Teff Injera with Flaxseed", "Genfo"]
+  restrictions   String[]
+  isActive       Boolean           @default(true)
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
