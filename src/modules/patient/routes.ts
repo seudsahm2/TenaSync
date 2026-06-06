@@ -1,9 +1,16 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { PatientService } from './service.js';
 
 const router = Router();
 
 // Eyob's Patient/Customer Module Router
+
+/**
+ * PING test route
+ */
+router.get('/ping', (req: Request, res: Response) => {
+  res.json({ message: 'Patient module is working' });
+});
 
 /**
  * GET patient profile
