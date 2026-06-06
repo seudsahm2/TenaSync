@@ -308,26 +308,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const typingBubble = appendChatBubble('ai', 'Thinking...');
 
     try {
-      // Search matching doctors based on symptoms
-      const matchRes = await fetch('/api/clinicians/match', {
+      // Call the real live AI Chat endpoint!
+      const aiRes = await fetch('/api/patient/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symptoms: symptomsText })
+        body: JSON.stringify({ message: symptomsText })
       });
-      const doctors = await matchRes.json();
+      const aiData = await aiRes.json();
 
-      // Simulate deep AI health report alignment
+      typingBubble.remove();
+
+      let replyText = aiData.replyText || '';
+      if (!replyText) {
+        throw new Error('Empty AI response');
+      }
+
+      appendChatBubble('ai', replyText);
+
+      // Open Report results after 3 seconds
+      setTimeout(() => {
+        document.getElementById('res-possible-issue').textContent = symptomsText.toLowerCase().includes('neck') ? 'Cervical Spine Strain' : 'Lumbar Joint Compression';
+        document.getElementById('res-risk-level').className = severitySelect === 'Severe' ? 'results-risk-badge badge-red' : 'results-risk-badge badge-amber';
+        document.getElementById('res-risk-level').textContent = `${severitySelect.toUpperCase()} RISK`;
+        document.getElementById('res-recommended-action').textContent = `We recommend scheduling a consultation with a somatic specialist. Avoid lifting heavy objects for 48 hours.`;
+
+        showView('chatResults');
+      }, 3000);
+
+    } catch (err) {
+      // Graceful local backup simulation fallback if LLM is offline or has no keys
       setTimeout(() => {
         typingBubble.remove();
 
-        // Formulate AI reply
         let reply = `Based on your described symptoms: "${symptomsText}" (Duration: ${durationText || 'Unspecified'}, Severity: ${severitySelect}), `;
         reply += `I suspect a possible posture-related alignment stress. I strongly advise taking passive stretching breaks and extensions. `;
         reply += `I have prepared a medical report for you. Please tap below to view the results.`;
 
         appendChatBubble('ai', reply);
 
-        // Open Report results
         setTimeout(() => {
           document.getElementById('res-possible-issue').textContent = symptomsText.toLowerCase().includes('neck') ? 'Cervical Spine Strain' : 'Lumbar Joint Compression';
           document.getElementById('res-risk-level').className = severitySelect === 'Severe' ? 'results-risk-badge badge-red' : 'results-risk-badge badge-amber';
@@ -336,11 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           showView('chatResults');
         }, 3000);
-
       }, 1500);
-
-    } catch (err) {
-      typingBubble.textContent = "I'm experiencing connectivity issues. Please try again soon.";
     }
   });
 
