@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PatientService } from './service.js';
+import { callLLM } from '../../core/ai/engine.js';
 
 const router = Router();
 
@@ -96,6 +97,32 @@ router.post('/recovery/:id', async (req, res) => {
   try {
     const log = await PatientService.addRecoveryLog(req.params.id, req.body);
     res.json(log);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST talk to Patient AI Consultant
+ */
+router.post('/chat', async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: 'Missing message' });
+
+  try {
+    const systemPrompt = `
+You are TenaSync, an autonomous somatic health AI assistant representing physical therapists, osteopaths, and FemTech specialists in Ethiopia.
+Your task is to analyze the patient's symptoms, provide empathetic and warm somatic guidance, and suggest they see a specialist.
+
+Keep your response brief (2-4 sentences max), highly empathetic, and professional. 
+Suggest a relevant recovery action, and guide them to find a specialist in the app.
+
+Patient's symptoms: "${message}"
+
+Answer:`;
+
+    const reply = await callLLM(systemPrompt);
+    res.json({ replyText: reply });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
