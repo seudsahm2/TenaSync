@@ -7,8 +7,8 @@ This plan restructures the codebase to support 5 developers pushing to the `mast
 | Team Member | Module Ownership | Directory | Core Focus |
 |-------------|------------------|-----------|------------|
 | **Eyob** | 🧑‍🦱 **Patient/Customer Module** | `src/modules/patient/` | Patient profiles, medical history, symptom submission, appointment booking, recovery tracking, and privacy controls. |
-| **Seud** | 👩‍⚕️ **Doctor/Specialist Module** | `src/modules/doctor/` | Doctor verification, availability, patient list, consultation workspace, and professional dashboards. |
-| **Ermiyas** | 🤖 **AI Health Assistant Module** | `src/modules/ai_assistant/` | Enhancing the current `engine.ts` for deep symptom analysis, follow-up questions, emergency detection, and AI patient summaries. |
+| **Ermiyas** | 👩‍⚕️ **Doctor/Specialist Module** | `src/modules/doctor/` | Doctor verification, availability, patient list, consultation workspace, and professional dashboards. |
+| **Seud** | 🤖 **AI Health Assistant Module** | `src/modules/ai_assistant/` | Enhancing the current `engine.ts` for deep symptom analysis, follow-up questions, emergency detection, and AI patient summaries. |
 | **Yabsira** | 🌍 **Linguistics & Communication Module** | `src/modules/linguistics/` | Adding Amharic, Afaan Oromo, Tigrinya support, voice-to-text, and translating bot/TMA interactions. |
 | **Tigistu** | 🧘 **Specialized Health Modules** | `src/modules/specialized/` | Enhancing the existing Spine, Maternal, and Ancestral Nutrition logic with deep ergonomic analysis and personalized meal plans. |
 

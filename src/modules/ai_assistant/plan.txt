@@ -1,0 +1,291 @@
+That's actually a cleaner way to divide the work. Instead of splitting by technical features, split by major product modules. Each person owns one complete section of the platform.
+
+Team Structure (5 People)
+
+👤 Person 1 — Patient/Customer Module
+
+Everything related to patients.
+
+Features
+
+Registration/Login
+
+Patient profile
+
+Medical history
+
+Symptom submission
+
+Consultation history
+
+Appointment booking
+
+Recovery tracking
+
+Medication reminders
+
+Privacy controls
+
+Anonymous mode
+
+
+Screens
+
+Home
+
+Profile
+
+Appointments
+
+History
+
+Recovery dashboard
+
+
+
+---
+
+👩‍⚕️ Person 2 — Doctor/Specialist Module
+
+Everything related to healthcare professionals.
+
+Features
+
+Doctor registration
+
+Verification
+
+Professional profile
+
+Availability management
+
+Appointment management
+
+Patient list
+
+Consultation workspace
+
+Treatment plans
+
+Progress monitoring
+
+Professional dashboard
+
+
+Screens
+
+Doctor Dashboard
+
+Patient Requests
+
+Schedule
+
+Consultations
+
+Profile
+
+
+
+---
+
+🤖 Person 3 — AI Health Assistant Module
+
+The brain of the system.
+
+Features
+
+Symptom analyzer
+
+AI consultation
+
+Follow-up questions
+
+Emergency detection
+
+AI patient summaries
+
+Health recommendations
+
+AI secretary
+
+Recovery suggestions
+
+Specialist recommendations
+
+
+Screens
+
+AI Chat
+
+Consultation Results
+
+AI Reports
+
+Emergency Alerts
+
+
+
+---
+
+🌍 Person 4 — Linguistics & Communication Module
+
+This is more important than most teams realize, especially in Ethiopia.
+
+Features
+
+Amharic support
+
+English support
+
+Afaan Oromo support
+
+Tigrinya support
+
+Voice-to-text
+
+Text-to-speech
+
+AI translation
+
+Multilingual chatbot
+
+Language switching
+
+Accessibility features
+
+
+Screens
+
+Language settings
+
+Voice interaction
+
+Translation interface
+
+
+
+---
+
+🧘 Person 5 — Specialized Health Modules
+
+This is what makes TenaSync unique.
+
+Spine & Posture
+
+Posture assessment
+
+Ergonomic analysis
+
+Stretch recommendations
+
+Recovery exercises
+
+
+Maternal Wellness
+
+Pregnancy wellness
+
+Postpartum recovery
+
+Pelvic floor recovery
+
+Women's privacy mode
+
+
+Ethiopian Nutrition
+
+Teff recommendations
+
+Telba recommendations
+
+Beso recommendations
+
+Moringa recommendations
+
+Personalized meal plans
+
+
+Screens
+
+Posture Center
+
+Maternal Wellness Center
+
+Nutrition Center
+
+Recovery Programs
+
+
+
+---
+
+Shared Features (Everyone Contributes)
+
+These touch multiple modules:
+
+Telegram Bot
+
+Patient module input
+
+AI module processing
+
+Doctor module responses
+
+Linguistic translation
+
+Specialized recommendations
+
+
+Chat System
+
+Patient ↔ Doctor
+
+AI ↔ Patient
+
+Translation support
+
+
+Maps & Location
+
+Doctor discovery
+
+Clinic discovery
+
+
+
+---
+
+Presentation Order
+
+1. Customer Module
+
+Patient enters symptoms
+
+
+
+2. AI Health Assistant
+
+AI analyzes and asks questions
+
+
+
+3. Linguistics Module
+
+AI supports local languages
+
+
+
+4. Specialized Health Module
+
+Posture / Maternal / Nutrition recommendations
+
+
+
+5. Doctor Module
+
+Doctor receives AI summary and consultation request
+
+
+
+
+This structure feels like five real products working together, and each team member can clearly explain ownership during the hackathon presentation. It also highlights what makes TenaSync different: AI consultation + multilingual support + specialized Ethiopian wellness care + professional healthcare access.
