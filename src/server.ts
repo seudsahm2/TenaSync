@@ -23,7 +23,12 @@ app.set('json replacer', (key: string, value: any) => {
   return typeof value === 'bigint' ? value.toString() : value;
 });
 
-// Serve TMA static files
+// Redirect root to Patient Portal
+app.get('/', (req, res) => {
+  res.redirect('/modules/patient/index.html');
+});
+
+// Serve TMA static files AFTER custom routes so our redirect takes priority over index.html static serving
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount distributed modules
@@ -104,7 +109,7 @@ app.post('/api/consultation/start', async (req, res) => {
       include: { patient: true, clinician: true }
     });
 
-    const welcomeText = 
+    const welcomeText =
       `Hello! I am ${clinician.firstName}'s automated front-desk assistant. ` +
       `I received your consultation request regarding: "${symptoms}". ` +
       `Could you tell me a little bit more about how long you've had these symptoms?`;
@@ -206,9 +211,9 @@ app.post('/api/maternal/dispatch', async (req, res) => {
 });
 
 // Start bot and express server
-app.listen(config.PORT, async () => {
+app.listen(config.PORT, 'localhost', async () => {
   console.log(`🚀 TenaSync Express Server running on http://localhost:${config.PORT}`);
-  
+
   // Launch Telegraf Bot via Polling in Dev
   bot.launch()
     .then(() => {

@@ -11,6 +11,24 @@ if (!config.BOT_TOKEN) {
 
 export const bot = new Telegraf(config.BOT_TOKEN);
 
+// Programmatically set global Menu Button on startup
+if (config.TMA_URL) {
+  const globalWebAppUrl = `${config.TMA_URL}/modules/patient/index.html`;
+  bot.telegram.setChatMenuButton({
+    menuButton: {
+      type: 'web_app',
+      text: 'TenaSync Portal',
+      web_app: {
+        url: globalWebAppUrl
+      }
+    }
+  }).then(() => {
+    console.log('✅ Global Chat Menu Button set to Patient Portal.');
+  }).catch((err: any) => {
+    console.error('⚠️ Failed to set global Chat Menu Button:', err.message);
+  });
+}
+
 console.log('🤖 Initializing TenaSync Bot handlers...');
 
 // 1. Setup Guest Mode (Stealth Interceptor)
@@ -25,13 +43,13 @@ bot.command('start', async (ctx) => {
   const username = ctx.from?.username || '';
   const firstName = ctx.from?.first_name || 'User';
 
-  const welcomeMessage = 
+  const welcomeMessage =
     `👋 *Welcome to ጤና-Sync (TenaSync)*\n\n` +
     `An autonomous, decentralized, privacy-preserving somatic health marketplace in the Telegram Ecosystem.\n\n` +
     `• If you are a *Patient*: Tap the button below to monitor your posture spine index, maternal reproductive recovery logs, and compile indigenous ancestral health remedies.\n\n` +
     `• If you are a *Clinician*: Connect your bot via *Telegram Business > Chatbots* to automate your scheduling and front desk rate negotiations.`;
 
-  const webAppUrl = `${config.TMA_URL}/index.html?user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
+  const webAppUrl = `${config.TMA_URL}/modules/patient/index.html?user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
 
   await ctx.reply(welcomeMessage, {
     parse_mode: 'Markdown',
@@ -46,7 +64,7 @@ bot.command('start', async (ctx) => {
 });
 
 bot.command('help', async (ctx) => {
-  const helpText = 
+  const helpText =
     `🔍 *TenaSync Helper commands:*\n\n` +
     `/start - Initialize workspace link and access Mini App\n` +
     `/help - View this help menu\n\n` +

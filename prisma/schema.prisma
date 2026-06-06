@@ -46,8 +46,59 @@ model User {
   clinicianConsultations ConsultationSession[] @relation("ClinicianRelation")
   documents            ClinicianDocument[] // Clinician knowledge books/guidelines
   
+  // Patient Profile & Recovery Relations
+  patientProfile       PatientProfile?
+  recoveryLogs         RecoveryLog[]
+  
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+}
+
+model PatientProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Demographics
+  fullName           String?
+  age                Int?
+  gender             String?
+  phoneNumber        String?
+  preferredLanguage  String   @default("English")
+  location           String?
+  emergencyContact   String?
+  
+  // Lifestyle Info
+  occupation         String?
+  activityLevel      String?
+  workStyle          String?
+  
+  // Medical Info
+  existingConditions String?
+  allergies          String?
+  currentMedications String?
+  previousInjuries   String?
+  
+  // Privacy Options
+  anonymousMode      Boolean  @default(false)
+  womensPrivacyMode  Boolean  @default(false)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model RecoveryLog {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  painLevel          Int      // 0 to 10
+  energyLevel        String   // "Low", "Medium", "High"
+  mobility           String   // "Improving", "No Change", "Worsening"
+  exerciseCompleted  Boolean  @default(false)
+  notes              String?
+  
+  createdAt          DateTime @default(now())
 }
 
 model ClinicianDocument {
