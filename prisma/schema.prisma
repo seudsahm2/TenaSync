@@ -1,0 +1,92 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PATIENT
+  CLINICIAN
+  ADMIN
+}
+
+enum ConsultationStatus {
+  ACTIVE
+  COMPLETED
+  MANUAL_TAKEOVER
+  CANCELLED
+}
+
+model User {
+  id                   String              @id @default(uuid())
+  telegramId           BigInt              @unique
+  username             String?
+  firstName            String
+  role                 Role                @default(PATIENT)
+  
+  // Telegram Business API Connection Credentials
+  businessConnectionId String?             @unique
+  canReply             Boolean             @default(false)
+  isVerifiedClinician  Boolean             @default(false)
+  
+  // Clinician Specialty & Treatment Options
+  specialty            String?                           // e.g., "Spine & Posture", "Postpartum Care", "Nutrition"
+  treatmentOptions     String[]            @default([])  // e.g., ["In-Home", "Hospital", "Telehealth"]
+  
+  // Somatic Biometric State Metrics
+  postureStrainIndex   Float               @default(0.0) // Calculated via sedentary stress factors
+  postpartumDay        Int?                              // If active, tracks maternal cycle day
+  hypertensionFlag     Boolean             @default(false)
+  
+  // Consultation Relations
+  patientConsultations ConsultationSession[] @relation("PatientRelation")
+  clinicianConsultations ConsultationSession[] @relation("ClinicianRelation")
+  documents            ClinicianDocument[] // Clinician knowledge books/guidelines
+  
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model ClinicianDocument {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   // The text extracted from the document
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model ConsultationSession {
+  id                    String              @id @default(uuid())
+  sessionId             String              @unique
+  patientSymptoms       String              // Initial symptoms described by patient
+  consultationType      String?             // "In-Home", "Hospital", "Telehealth"
+  scheduledTime         DateTime?           // Booked appointment time
+  
+  status                ConsultationStatus  @default(ACTIVE)
+  autoReplyEnabled      Boolean             @default(true)      // Auto-reply/consultation mode flag
+  
+  // Relational Foreign Keys
+  patientId             String
+  patient               User                @relation("PatientRelation", fields: [patientId], references: [id])
+  clinicianId           String
+  clinician             User                @relation("ClinicianRelation", fields: [clinicianId], references: [id])
+  
+  messages              ConsultationMessage[]
+  lastManualActive      DateTime?           // Human intervention timestamp for takeover cooldown
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+}
+
+model ConsultationMessage {
+  id                    String              @id @default(uuid())
+  consultationId        String
+  consultation          ConsultationSession @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  sender                Role
+  text                  String
+  telegramMessageId     Int?
+  createdAt             DateTime            @default(now())
+}
