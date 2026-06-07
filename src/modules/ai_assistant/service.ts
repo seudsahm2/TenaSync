@@ -10,12 +10,43 @@ export interface SymptomAnalysisResult {
 
 export class AIAssistantService {
   /**
+   * Fetch Patient Context String
+   */
+  static async getPatientContextStr(userId: string): Promise<string> {
+    if (!userId) return "No prior patient profile metrics provided.";
+    try {
+      // @ts-ignore
+      const pProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+      // @ts-ignore
+      const pLogs = await prisma.recoveryLog.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 });
+      
+      let patientContext = `Age: ${pProfile?.age || 'Unknown'}\n`;
+      patientContext += `Gender: ${pProfile?.gender || 'Unknown'}\n`;
+      patientContext += `Existing Conditions: ${pProfile?.existingConditions || 'None reported'}\n`;
+      patientContext += `Previous Injuries: ${pProfile?.previousInjuries || 'None reported'}\n`;
+      patientContext += `Allergies: ${pProfile?.allergies || 'None reported'}\n`;
+      patientContext += `Current Medications: ${pProfile?.currentMedications || 'None reported'}\n`;
+      if (pLogs && pLogs.length > 0) {
+        patientContext += `Recent Pain Level: ${pLogs[0].painLevel}/10 (Mobility: ${pLogs[0].mobility})\n`;
+      }
+      return patientContext;
+    } catch (e) {
+      return "Error retrieving profile metrics.";
+    }
+  }
+
+  /**
    * Analyze symptoms, give actionable home-care advice, and return follow-up questions
    */
-  static async analyzeSymptoms(symptoms: string): Promise<SymptomAnalysisResult> {
+  static async analyzeSymptoms(symptoms: string, userId: string = ''): Promise<SymptomAnalysisResult> {
+    const patientContext = await this.getPatientContextStr(userId);
+    
     const prompt = `You are an AI Medical Assistant for TenaSync in Ethiopia. 
 Analyze the following patient consultation log / symptoms: 
 "${symptoms}"
+
+=== PATIENT PROFILE METRICS ===
+${patientContext}
 
 IMPORTANT RULES:
 1. Do NOT ask endless questions. If you have a general idea of the condition, conclude immediately.
@@ -69,11 +100,16 @@ Reply ONLY with valid JSON.`;
   /**
    * General Health and Traditional Medicine Q&A
    */
-  static async askGeneralHealth(question: string, language: string = 'English'): Promise<string> {
+  static async askGeneralHealth(question: string, language: string = 'English', userId: string = ''): Promise<string> {
+    const patientContext = await this.getPatientContextStr(userId);
+    
     const prompt = `You are a medical AI assistant for TenaSync in Ethiopia. 
 Answer the following general health question: "${question}".
 
-If the question is about traditional Ethiopian medicine or dietary habits (like Teff, Beso, Telba, Moringa, Abish, Shiferaw), provide accurate health benefits and how to prepare it at home for recovery. Provide medical disclaimers.
+=== PATIENT PROFILE METRICS ===
+${patientContext}
+
+If the question is about traditional Ethiopian medicine or dietary habits (like Teff, Beso, Telba, Moringa, Abish, Shiferaw), provide accurate health benefits and how to prepare it at home for recovery. Provide medical disclaimers. Use the Patient Profile Metrics above to personalize the advice if relevant (e.g. noting their allergies or existing conditions).
 Respond in ${language}. If the language is Amharic, ensure the output uses Amharic script.`;
 
     try {

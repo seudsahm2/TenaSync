@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import { config } from './config/index.js';
 import { prisma } from './core/db/index.js';
 import { bot } from './bot/index.js';
@@ -11,12 +13,32 @@ import doctorRoutes from './modules/doctor/routes.js';
 import aiAssistantRoutes from './modules/ai_assistant/routes.js';
 import linguisticsRoutes from './modules/linguistics/routes.js';
 import specializedRoutes from './modules/specialized/routes.js';
+import adminRoutes from './modules/admin/routes.js';
 
 // Resolve dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
+
+// Global Socket.io Instance
+export const io = new Server(httpServer, {
+  cors: { origin: '*' }
+});
+
+io.on('connection', (socket) => {
+  // Client connects to a specific doctor's room to watch live slots
+  socket.on('watch_doctor_slots', (doctorId) => {
+    socket.join(`doc_${doctorId}`);
+  });
+  
+  // Client connects to a specific consultation session for live chat
+  socket.on('join_consultation', (sessionId) => {
+    socket.join(`consultation_${sessionId}`);
+  });
+});
+
 app.use(express.json());
 // Global BigInt serializer override for JSON responses
 app.set('json replacer', (key: string, value: any) => {
@@ -37,6 +59,7 @@ app.use('/modules/doctor', express.static(path.join(__dirname, 'modules/doctor/p
 app.use('/modules/ai_assistant', express.static(path.join(__dirname, 'modules/ai_assistant/public')));
 app.use('/modules/linguistics', express.static(path.join(__dirname, 'modules/linguistics/public')));
 app.use('/modules/specialized', express.static(path.join(__dirname, 'modules/specialized/public')));
+app.use('/modules/admin', express.static(path.join(__dirname, 'modules/admin/public')));
 
 // Mount distributed modules
 app.use('/api/patient', patientRoutes);            // Eyob's module
@@ -44,6 +67,7 @@ app.use('/api/doctor', doctorRoutes);              // Seud's module
 app.use('/api/ai', aiAssistantRoutes);             // Ermiyas's module
 app.use('/api/linguistics', linguisticsRoutes);    // Yabsira's module
 app.use('/api/specialized', specializedRoutes);    // Tigistu's module
+app.use('/api/admin', adminRoutes);
 
 /**
  * API: Match clinicians based on patient symptoms
@@ -82,19 +106,28 @@ app.post('/api/consultation/start', async (req, res) => {
   }
 
   try {
-    let patient = await prisma.user.findUnique({
-      where: { telegramId: BigInt(patientTelegramId) }
-    });
-
-    if (!patient) {
-      patient = await prisma.user.create({
-        data: {
-          telegramId: BigInt(patientTelegramId),
-          firstName: 'Patient ' + patientTelegramId.toString().slice(-4),
-          role: 'PATIENT'
-        }
+    let patient;
+    // Check if patientTelegramId is actually the UUID
+    if (patientTelegramId.includes('-')) {
+      patient = await prisma.user.findUnique({
+        where: { id: patientTelegramId }
       });
+    } else {
+      patient = await prisma.user.findUnique({
+        where: { telegramId: BigInt(patientTelegramId) }
+      });
+      if (!patient) {
+        patient = await prisma.user.create({
+          data: {
+            telegramId: BigInt(patientTelegramId),
+            firstName: 'Patient ' + patientTelegramId.toString().slice(-4),
+            role: 'PATIENT'
+          }
+        });
+      }
     }
+
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
     const clinician = await prisma.user.findUnique({
       where: { id: clinicianId }
@@ -130,10 +163,12 @@ app.post('/api/consultation/start', async (req, res) => {
     });
 
     let delivered = false;
+    const tgIdToMessage = patient.telegramId.toString();
+    
     if (clinician.businessConnectionId && clinician.canReply) {
       try {
         await (bot.telegram as any).callApi('sendMessage', {
-          chat_id: patientTelegramId.toString(),
+          chat_id: tgIdToMessage,
           text: welcomeText,
           business_connection_id: clinician.businessConnectionId
         });
@@ -150,12 +185,12 @@ app.post('/api/consultation/start', async (req, res) => {
       console.log(`[Server] Falling back to Direct Bot DMs...`);
       try {
         await bot.telegram.sendMessage(
-          patientTelegramId.toString(),
+          tgIdToMessage,
           `🏪 *${clinician.firstName}'s Front Desk:* ${welcomeText}`,
           { parse_mode: 'Markdown' }
         );
       } catch (err: any) {
-        console.warn(`[Server] Failed to send fallback DM to patient ${patientTelegramId}:`, err.message);
+        console.warn(`[Server] Failed to send fallback DM to patient ${tgIdToMessage}:`, err.message);
         if (err.message.includes('chat not found') || err.message.includes('blocked')) {
           warnings.push(`You (Patient) have not started @TenaSyncbot yet. Please search for @TenaSyncbot and tap Start to receive direct notification messages.`);
         }
@@ -218,8 +253,8 @@ app.post('/api/maternal/dispatch', async (req, res) => {
 });
 
 // Start bot and express server
-app.listen(config.PORT, '0.0.0.0', async () => {
-  console.log(`🚀 TenaSync Express Server running on port ${config.PORT}`);
+httpServer.listen(config.PORT, '0.0.0.0', async () => {
+  console.log(`🚀 TenaSync Express/Socket.io Server running on port ${config.PORT}`);
 
   // Launch Telegraf Bot via Polling in Dev
   bot.telegram.deleteWebhook({ drop_pending_updates: true })
@@ -235,3 +270,5 @@ app.listen(config.PORT, '0.0.0.0', async () => {
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+

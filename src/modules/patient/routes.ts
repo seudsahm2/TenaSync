@@ -14,6 +14,20 @@ router.get('/ping', (req: Request, res: Response) => {
 });
 
 /**
+ * POST login/create user
+ */
+router.post('/login', async (req, res) => {
+  try {
+    const { telegramId, name } = req.body;
+    if (!telegramId) return res.status(400).json({ error: 'Missing telegramId' });
+    const user = await PatientService.loginUser(telegramId, name);
+    res.json(user);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET patient profile
  */
 router.get('/profile/:id', async (req, res) => {
@@ -83,8 +97,37 @@ router.post('/appointments/schedule', async (req, res) => {
  */
 router.get('/history/:id', async (req, res) => {
   try {
-    const history = await PatientService.getCompletedConsultations(req.params.id);
+    // Actually, get ALL consultations for chat functionality
+    const history = await PatientService.getAllConsultations(req.params.id);
     res.json(history);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST send message from patient
+ */
+router.post('/consultations/:sessionId/message', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { text, userId } = req.body;
+    if (!text) return res.status(400).json({ error: 'Missing text' });
+
+    const message = await PatientService.sendMessage(userId, sessionId, text);
+    res.json({ success: true, message });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET consultation messages
+ */
+router.get('/consultations/:sessionId/messages', async (req, res) => {
+  try {
+    const messages = await PatientService.getConsultationMessages(req.params.sessionId);
+    res.json(messages);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

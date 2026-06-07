@@ -409,7 +409,8 @@ export class DoctorService {
             where: {
                 sessionId: sessionId,
                 clinicianId: doctorId
-            }
+            },
+            include: { patient: true, clinician: true }
         });
 
         if (!consultation) {
@@ -423,6 +424,18 @@ export class DoctorService {
                 text: messageData.text
             }
         });
+
+        // Notify patient via Telegram
+        try {
+            const { bot } = await import('../../bot/index.js');
+            await bot.telegram.sendMessage(
+                consultation.patient.telegramId.toString(),
+                `👨‍⚕️ *Dr. ${consultation.clinician.firstName}:*\n\n${messageData.text}`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (err: any) {
+            console.warn('[DoctorService] Failed to notify patient via Telegram:', err.message);
+        }
 
         // Update consultation timestamp
         await prisma.consultationSession.update({
@@ -495,6 +508,31 @@ export class DoctorService {
     }
 
     // ==================== AVAILABILITY MANAGEMENT ====================
+
+    /**
+     * Bulk overwrite availability calendar
+     */
+    async bulkUpdateAvailability(doctorId: string, slots: any[]): Promise<void> {
+        // Clear existing
+        // @ts-ignore
+        await prisma.doctorAvailability.deleteMany({
+            where: { clinicianId: doctorId }
+        });
+
+        // Insert new
+        if (slots && slots.length > 0) {
+            // @ts-ignore
+            await prisma.doctorAvailability.createMany({
+                data: slots.map(s => ({
+                    clinicianId: doctorId,
+                    dayOfWeek: s.dayOfWeek,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
+                    isAvailable: s.isAvailable !== undefined ? s.isAvailable : true
+                }))
+            });
+        }
+    }
 
     /**
      * Add or update an availability slot
@@ -598,3 +636,4 @@ export class DoctorService {
 }
 
 export const doctorService = new DoctorService();
+

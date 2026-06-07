@@ -86,7 +86,16 @@ export async function processClinicianConsultationTurn(
   const consultation = await prisma.consultationSession.findUnique({
     where: { id: consultationId },
     include: {
-      patient: true,
+      // @ts-ignore
+      patient: {
+        include: {
+          patientProfile: true,
+          recoveryLogs: {
+            orderBy: { createdAt: 'desc' },
+            take: 3
+          }
+        }
+      },
       clinician: {
         include: { documents: true }
       },
@@ -96,36 +105,57 @@ export async function processClinicianConsultationTurn(
 
   if (!consultation) throw new Error(`Consultation session ${consultationId} not found`);
 
+  // @ts-ignore
   const clinician = consultation.clinician;
   const docs = clinician.documents || [];
 
   // 1. Compile clinician document guidelines
   const guidelinesContext = docs.length > 0
+    // @ts-ignore
     ? docs.map((d, index) => `--- Document ${index + 1}: ${d.title} ---\n${d.content}`).join('\n\n')
     : "No reference guideline documents uploaded yet by this clinician.";
 
+  // 2. Compile Patient Metrics Context
+  // @ts-ignore
+  const pProfile = consultation.patient.patientProfile;
+  // @ts-ignore
+  const pLogs = consultation.patient.recoveryLogs || [];
+  
+  let patientContext = `Age: ${pProfile?.age || 'Unknown'}\n`;
+  patientContext += `Gender: ${pProfile?.gender || 'Unknown'}\n`;
+  patientContext += `Existing Conditions: ${pProfile?.existingConditions || 'None reported'}\n`;
+  patientContext += `Previous Injuries: ${pProfile?.previousInjuries || 'None reported'}\n`;
+  patientContext += `Allergies: ${pProfile?.allergies || 'None reported'}\n`;
+  patientContext += `Current Medications: ${pProfile?.currentMedications || 'None reported'}\n`;
+  if (pLogs.length > 0) {
+    patientContext += `Recent Pain Level: ${pLogs[0].painLevel}/10 (Mobility: ${pLogs[0].mobility})\n`;
+  }
+
   console.log(`[RAG Engine] Loaded ${docs.length} document(s) for clinician ${clinician.firstName}`);
 
-  // 2. Build precision RAG prompt for medical consultation and booking
+  // 3. Build precision RAG prompt for medical consultation and booking
   const prompt = `
 You are an advanced medical front-desk AI assistant representing Dr. ${clinician.firstName}, a specialist in ${clinician.specialty || 'somatic health'}. 
 Your task is to answer the patient's symptoms or questions based STRICTLY on the clinician's reference guidelines provided below, and help them book an appropriate appointment.
 
 === CLINICIAN REFERENCE GUIDELINES ===
 ${guidelinesContext}
+
+=== PATIENT PROFILE METRICS (DO NOT ASK FOR THESE, USE THEM TO INFORM YOUR DIAGNOSIS) ===
+${patientContext}
 ======================================
 
 Patient's message: "${patientText}"
 
 RULES FOR ANSWERING:
 1. You must answer the patient's question or address their symptoms ONLY if the answer is explicitly stated in or directly derived from the CLINICIAN REFERENCE GUIDELINES.
-2. Keep the answer professional, warm, and clear (2-4 sentences max).
-3. After addressing their medical query, guide them towards booking an appointment. Ask if they prefer:
+2. If the guidelines are missing, but you can give safe, general advice based on the Patient Profile Metrics, do so.
+3. Keep the answer professional, warm, and clear (2-4 sentences max). Do not ask for information already provided in the Patient Profile Metrics. Ask if their data is up to date if relevant to the treatment.
+4. After addressing their medical query, guide them towards booking an appointment. Ask if they prefer:
    - In-Home Treatment (private visit to their location)
    - Hospital/Clinic Visit (they come to the facility)
    - Telehealth Consultation (video/phone call)
-4. If the patient asks about scheduling or mentions wanting to book, help them choose a convenient time.
-5. If the CLINICIAN REFERENCE GUIDELINES do not contain the answer to their medical question, or if there are no guidelines uploaded, you MUST respond with the exact tag: [NOT_FOUND] and absolutely nothing else. Do not make up medical advice, use external knowledge, or suggest general tips.
+5. If the patient asks about scheduling or mentions wanting to book, help them choose a convenient time.
 
 Answer:`;
 

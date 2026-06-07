@@ -2,6 +2,36 @@ import { prisma } from '../../core/db/index.js';
 
 export class PatientService {
     /**
+     * Login or create user
+     */
+    static async loginUser(telegramIdStr: string, nameFallback: string) {
+        // For local testing fallback (e.g. web_12345)
+        let isLocal = telegramIdStr.startsWith('web_');
+        let tId = isLocal ? BigInt(Math.floor(Math.random() * 1000000)) : BigInt(telegramIdStr);
+        
+        // Try to find user by telegram ID
+        let user = null;
+        try {
+            user = await prisma.user.findUnique({
+                where: { telegramId: tId }
+            });
+        } catch (e) {
+            // Ignore format errors
+        }
+
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    telegramId: tId,
+                    firstName: nameFallback || 'Patient',
+                    role: 'PATIENT'
+                }
+            });
+        }
+        return user;
+    }
+
+    /**
      * Get or create patient profile
      */
     static async getProfile(userId: string) {
@@ -147,6 +177,111 @@ export class PatientService {
     }
 
     /**
+     * Get ALL consultations (for chat UI list)
+     */
+    static async getAllConsultations(userId: string) {
+        return prisma.consultationSession.findMany({
+            where: { patientId: userId },
+            include: { clinician: true },
+            orderBy: { updatedAt: 'desc' }
+        });
+    }
+
+    /**
+     * Send a message from patient to doctor via Web App
+     */
+    static async sendMessage(userId: string, sessionId: string, text: string) {
+        const consultation = await prisma.consultationSession.findFirst({
+            where: { sessionId, patientId: userId },
+            include: { patient: true, clinician: true }
+        });
+
+        if (!consultation) throw new Error('Consultation not found');
+
+        // Create the user message
+        const message = await prisma.consultationMessage.create({
+            data: {
+                consultationId: consultation.id,
+                sender: 'PATIENT',
+                text
+            }
+        });
+
+        await prisma.consultationSession.update({
+            where: { id: consultation.id },
+            data: { updatedAt: new Date() }
+        });
+
+        // Broadcast patient message to sockets
+        try {
+            const { io } = await import('../../server.js');
+            io.to(`consultation_${sessionId}`).emit('new_message', {
+                id: message.id,
+                sender: 'PATIENT',
+                text,
+                createdAt: message.createdAt
+            });
+        } catch(e) {}
+
+        // If auto-reply is enabled, process the AI turn!
+        if (consultation.autoReplyEnabled) {
+            try {
+                // To avoid circular dependency, dynamically import engine
+                const { processClinicianConsultationTurn } = await import('../../core/ai/engine.js');
+                
+                // Add a small delay for realism
+                setTimeout(async () => {
+                    try {
+                        const aiResult = await processClinicianConsultationTurn(consultation.id, text);
+                        
+                        // Save AI reply
+                        const aiMsg = await prisma.consultationMessage.create({
+                            data: {
+                                consultationId: consultation.id,
+                                sender: 'CLINICIAN',
+                                text: aiResult.replyText
+                            }
+                        });
+
+                        const { io } = await import('../../server.js');
+                        io.to(`consultation_${sessionId}`).emit('new_message', {
+                            id: aiMsg.id,
+                            sender: 'CLINICIAN',
+                            text: aiMsg.text,
+                            createdAt: aiMsg.createdAt
+                        });
+                    } catch (e) {
+                        console.error('AI Auto-reply failed:', e);
+                    }
+                }, 1500);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        return message;
+    }
+
+    /**
+     * Get consultation messages
+     */
+    static async getConsultationMessages(sessionId: string) {
+        const consultation = await prisma.consultationSession.findUnique({
+            where: { sessionId },
+            include: {
+                messages: { orderBy: { createdAt: 'asc' } },
+                clinician: true
+            }
+        });
+        if (!consultation) throw new Error('Not found');
+        return {
+            status: consultation.status,
+            clinicianName: consultation.clinician.firstName,
+            messages: consultation.messages
+        };
+    }
+
+    /**
      * Update or schedule appointment details
      */
     static async scheduleAppointment(sessionId: string, scheduledTime: string, type: string) {
@@ -258,3 +393,4 @@ export class PatientService {
         });
     }
 }
+

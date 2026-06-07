@@ -2,160 +2,196 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Doctor Dashboard - TenaSync</title>
-    <link rel="stylesheet" href="css/style.css">
+    <!-- Use the premium main.css theme -->
+    <link rel="stylesheet" href="/css/main.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div class="doctor-layout">
-        <!-- Sidebar Navigation -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>🩺 TenaSync</h2>
-                <p>Doctor Portal</p>
-            </div>
-            <ul class="nav-menu">
-                <li class="nav-item active" data-view="dashboard">Dashboard</li>
-                <li class="nav-item" data-view="patients">Patients</li>
-                <li class="nav-item" data-view="consultations">Consultations</li>
-                <li class="nav-item" data-view="documents">Documents & Guidelines</li>
-            </ul>
-        </div>
+    <header class="app-header">
+        <div class="app-logo"><span>ጤና</span>-Sync Clinician</div>
+        <div class="app-subtitle">Provider Control Panel</div>
+    </header>
 
-        <!-- Main Content Area -->
-        <div class="main-content">
-            <div class="topbar">
-                <h3 id="view-title">Dashboard</h3>
+    <div class="container" style="padding-bottom: 90px;">
+        <div class="glass-panel" style="margin-bottom: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="view-title" style="margin:0; font-size:18px;">Dashboard</h3>
                 <div>
-                    <span id="doctor-name">Loading Profile...</span>
-                    <input type="text" id="mock-doctor-id" placeholder="Mock Doctor ID for Testing" style="margin-left:15px; padding: 5px;">
-                    <button class="btn" id="btn-login">Login</button>
+                    <span id="doctor-name" style="font-size:14px; font-weight:600; color:var(--color-accent);">Loading Profile...</span>
+                    <!-- Hidden mock input to preserve JS logic seamlessly -->
+                    <input type="text" id="mock-doctor-id" style="display:none;">
+                    <button id="btn-login" style="display:none;">Login</button>
                 </div>
             </div>
-            
-            <div class="content-area" id="content-area">
-                <!-- Views will be injected here via app.js -->
-            </div>
+        </div>
+        
+        <div id="content-area">
+            <!-- Views will be injected here via app.js -->
         </div>
     </div>
 
+    <!-- Bottom Navigation (Replacing the old sidebar) -->
+    <nav class="tab-navigation">
+        <div class="nav-item active" data-view="dashboard">
+            <div class="nav-icon" style="pointer-events:none;">🏠</div>
+            <span style="pointer-events:none;">Dashboard</span>
+        </div>
+        <div class="nav-item" data-view="patients">
+            <div class="nav-icon" style="pointer-events:none;">👥</div>
+            <span style="pointer-events:none;">Patients</span>
+        </div>
+        <div class="nav-item" data-view="consultations">
+            <div class="nav-icon" style="pointer-events:none;">💬</div>
+            <span style="pointer-events:none;">Consults</span>
+        </div>
+        <div class="nav-item" data-view="documents">
+            <div class="nav-icon" style="pointer-events:none;">📄</div>
+            <span style="pointer-events:none;">Docs</span>
+        </div>
+    </nav>
+
     <!-- View Templates -->
     <template id="tpl-dashboard">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3 id="stat-patients">0</h3>
-                <p>Total Patients</p>
+        <div class="dashboard-banner glass-panel">
+            <div style="font-size:14px; color:var(--color-text-secondary);">Welcome to your Clinic,</div>
+            <h2 id="banner-doctor-name" style="font-size:24px; margin-top:2px;">Doctor</h2>
+        </div>
+
+        <h3 class="section-title">📊 Key Metrics</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom:20px;">
+            <div class="glass-panel" style="margin:0; padding:15px; text-align:center;">
+                <div style="font-size:32px; font-weight:800; color:var(--color-accent);" id="stat-patients">0</div>
+                <div style="font-size:11px; color:var(--color-text-secondary); text-transform:uppercase;">Patients</div>
             </div>
-            <div class="stat-card">
-                <h3 id="stat-active-consultations">0</h3>
-                <p>Active Consultations</p>
+            <div class="glass-panel" style="margin:0; padding:15px; text-align:center;">
+                <div style="font-size:32px; font-weight:800; color:var(--color-success);" id="stat-active-consultations">0</div>
+                <div style="font-size:11px; color:var(--color-text-secondary); text-transform:uppercase;">Active Consults</div>
             </div>
-            <div class="stat-card">
-                <h3 id="stat-total-consultations">0</h3>
-                <p>Total Consultations Completed</p>
+            <div class="glass-panel" style="margin:0; padding:15px; text-align:center; grid-column: 1 / span 2;">
+                <div style="font-size:32px; font-weight:800; color:#F472B6;" id="stat-total-consultations">0</div>
+                <div style="font-size:11px; color:var(--color-text-secondary); text-transform:uppercase;">Completed Consults</div>
             </div>
         </div>
-        <div class="card" style="margin-top:20px;">
-            <h3>Profile Settings</h3>
-            <p>Specialty: <strong id="profile-specialty">None</strong></p>
-            <p>Verified: <strong id="profile-verified">No</strong></p>
-            <p>Treatment Options: <strong id="profile-treatments">None</strong></p>
+
+        <div class="glass-panel">
+            <h3 style="font-size:16px; margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:10px;">👤 Profile Settings</h3>
             
-            <hr style="margin:20px 0; border: 1px solid #eee;">
-            
-            <h4>Manage Availability</h4>
-            <div style="display:flex; gap: 10px; margin-bottom:15px;">
-                <select id="avail-day">
-                    <option value="1">Monday</option>
-                    <option value="2">Tuesday</option>
-                    <option value="3">Wednesday</option>
-                    <option value="4">Thursday</option>
-                    <option value="5">Friday</option>
-                    <option value="6">Saturday</option>
-                    <option value="0">Sunday</option>
-                </select>
-                <input type="time" id="avail-start" value="09:00">
-                <input type="time" id="avail-end" value="17:00">
-                <button class="btn btn-success" id="btn-add-avail">Add Slot</button>
+            <div class="form-group">
+                <label class="form-label">Specialty</label>
+                <input type="text" id="profile-specialty" class="form-input">
             </div>
-            <ul id="availability-list"></ul>
+            <div class="form-group">
+                <label class="form-label">Treatment Options (comma separated)</label>
+                <input type="text" id="profile-treatments" class="form-input">
+            </div>
+            <p style="font-size:13px; margin-bottom:15px;"><span style="color:var(--color-text-secondary);">Verified Clinician:</span> <strong id="profile-verified" style="color:var(--color-success);">No</strong></p>
+            <button class="btn btn-primary" id="btn-update-profile" style="background:#3b82f6;">Update Profile</button>
+            
+            <h4 style="font-size:15px; margin-top:25px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:10px;">🗓️ Master Weekly Calendar</h4>
+            <p style="font-size:12px; color:var(--color-text-secondary); margin-bottom:15px;">Select the precise slots you are available. Patients will see this identical calendar in real-time.</p>
+            
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+                <span style="font-size:13px; font-weight:600;">Slot Duration:</span>
+                <select id="slot-interval" class="form-input select-input" style="width:120px; padding:6px;">
+                    <option value="15">15 Minutes</option>
+                    <option value="30" selected>30 Minutes</option>
+                    <option value="40">40 Minutes</option>
+                    <option value="60">60 Minutes</option>
+                </select>
+            </div>
+            
+            <div class="calendar-grid-container" style="overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid var(--glass-border); padding:10px;">
+                <div id="weekly-calendar-grid" style="display:grid; grid-template-columns: 60px repeat(7, minmax(80px, 1fr)); gap:5px;">
+                    <!-- Calendar Header -->
+                    <div style="font-weight:bold; font-size:11px; color:gray; text-align:right; padding-right:5px;">Time</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Mon</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Tue</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Wed</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Thu</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Fri</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Sat</div>
+                    <div style="font-weight:bold; font-size:11px; text-align:center;">Sun</div>
+                    <!-- Body injected via JS -->
+                </div>
+            </div>
+            <button class="btn btn-primary" id="btn-save-calendar" style="background:#10B981; margin-top:15px;">💾 Save Calendar Layout</button>
         </div>
     </template>
 
     <template id="tpl-patients">
-        <div class="card">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Patient Name</th>
-                        <th>Telegram ID</th>
-                        <th>Last Consultation</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="patient-list">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
+        <div class="glass-panel">
+            <h3 style="font-size:16px; margin-bottom:15px;">👥 Assigned Patients</h3>
+            <div id="patient-list" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Populated by JS -->
+            </div>
         </div>
     </template>
 
     <template id="tpl-consultations">
-        <div class="consultation-workspace">
-            <div class="consultation-list" id="consultation-list">
-                <!-- Chat list here -->
+        <div class="glass-panel" style="padding:10px;">
+            <!-- Chat list -->
+            <div id="consultation-list" style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:15px;">
+                <!-- Avatars/List here -->
             </div>
-            <div class="chat-area" id="chat-area" style="display: none;">
-                <div class="chat-header">
+            
+            <!-- Chat area -->
+            <div id="chat-area" style="display: none; flex-direction: column; height: 50vh;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05);">
                     <div>
-                        <h3 id="chat-patient-name" style="margin:0;">Select a patient</h3>
-                        <p id="chat-status" style="margin:0; font-size:0.8em; color:gray;">Status: Active</p>
+                        <h3 id="chat-patient-name" style="margin:0; font-size:16px; color:var(--color-primary);">Select a patient</h3>
+                        <p id="chat-status" style="margin:0; font-size:11px; color:var(--color-text-secondary);">Status: Active</p>
                     </div>
-                    <div>
-                        <button class="btn btn-danger" id="btn-takeover">Manual Takeover (Disable AI)</button>
-                    </div>
+                    <button class="btn btn-danger" id="btn-takeover" style="padding:6px 12px; font-size:11px; width:auto;">Manual Takeover</button>
                 </div>
                 
-                <div class="chat-history" id="chat-history" style="display: flex; flex-direction: column;">
-                    <div class="ai-summary-box" id="ai-summary-box" style="display:none;">
-                        <strong>🤖 AI Patient Summary:</strong>
-                        <p id="ai-summary-text" style="white-space: pre-wrap; font-size: 0.9em;"></p>
+                <div id="chat-history" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:5px;">
+                    <div id="ai-summary-box" style="display:none; background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); border-radius:8px; padding:10px;">
+                        <strong style="color:var(--color-warning); font-size:12px;">🤖 AI Patient Summary:</strong>
+                        <p id="ai-summary-text" style="white-space: pre-wrap; font-size: 11px; margin-top:5px; line-height:1.4;"></p>
                     </div>
                     <!-- Messages go here -->
                 </div>
                 
-                <div class="chat-input">
-                    <input type="text" id="chat-input-text" placeholder="Type a message to the patient...">
-                    <button class="btn btn-success" id="btn-send-message">Send</button>
+                <div style="display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                    <input type="text" id="chat-input-text" class="form-input" style="flex:1;" placeholder="Type message...">
+                    <button class="btn btn-primary" id="btn-send-message" style="width:auto; padding:10px 16px;">➔</button>
                 </div>
             </div>
         </div>
     </template>
 
     <template id="tpl-documents">
-        <div class="card">
-            <h3>Upload Medical Guidelines</h3>
-            <p>Upload reference guidelines that the AI Assistant will use to answer patient questions.</p>
-            <div style="margin-bottom: 20px;">
-                <input type="text" id="doc-title" placeholder="Document Title" style="padding:8px; margin-right:10px;">
-                <textarea id="doc-content" placeholder="Paste guidelines text here..." style="padding:8px; width:100%; height:100px; margin-top:10px; display:block; margin-bottom:10px;"></textarea>
-                <button class="btn btn-success" id="btn-upload-doc">Upload Guideline</button>
+        <div class="glass-panel">
+            <h3 style="font-size:16px; margin-bottom:10px;">📄 Upload Medical Guidelines</h3>
+            <p style="font-size:12px; color:var(--color-text-secondary); margin-bottom:20px;">Upload reference guidelines (PDF/DOC/TXT) that your AI Assistant will use to autonomously answer patient questions.</p>
+            
+            <div class="form-group">
+                <input type="text" id="doc-title" class="form-input" placeholder="Document Title (e.g. Hypertension Protocol)" required>
             </div>
-            <hr>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="document-list">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
+            
+            <div class="form-group">
+                <div id="dash-file-dropzone" style="border: 2px dashed rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.05); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; color: var(--color-text-secondary);">
+                    <span style="font-size: 24px; display:block; margin-bottom:5px;">📁</span>
+                    <span style="font-weight: 600; color: #fff;">Click to select official PDF or TXT</span>
+                    <input type="file" id="dash-doc-file" accept=".txt,.pdf,.doc,.docx" style="display:none;" required>
+                </div>
+                <div id="dash-file-name" style="font-size:12px; font-weight:600; color:var(--color-success); text-align:center; margin-top:8px;"></div>
+            </div>
+            <button class="btn btn-primary" id="btn-upload-doc" style="background:#10B981;">Upload Guideline</button>
+            
+            <hr style="margin:25px 0; border:1px solid rgba(255,255,255,0.05);">
+            
+            <h4 style="font-size:15px; margin-bottom:15px;">Active Guidelines</h4>
+            <div id="document-list" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Populated by JS -->
+            </div>
         </div>
     </template>
 
-    <script src="../app.js"></script>
+    <script src="/modules/doctor/app.js"></script>
 </body>
 </html>

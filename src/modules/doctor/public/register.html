@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Doctor Registration - TenaSync</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <style>
+        .register-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            border-radius: 20px;
+        }
+        .file-upload {
+            border: 2px dashed rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            color: var(--color-text-secondary);
+            transition: all 0.3s ease;
+        }
+        .file-upload:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--color-accent);
+        }
+    </style>
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="app-logo"><span>ጤና</span>-Sync Clinician</div>
+        <div class="app-subtitle">Provider Onboarding Portal</div>
+    </header>
+
+    <div class="container">
+        <div class="glass-panel" style="margin-top: 20px;">
+            <h2 class="panel-title" style="justify-content:center; border:none; margin-bottom:0;">👨‍⚕️ Verification Request</h2>
+            <p style="font-size:12px; color:var(--color-text-secondary); text-align:center; margin-bottom:24px;">
+                Join the TenaSync somatic health marketplace. Please provide your professional credentials for administrative review.
+            </p>
+
+        <div id="status-message" style="display:none; padding:15px; border-radius:8px; margin-bottom:20px; text-align:center; font-size:14px; font-weight:600;"></div>
+
+        <form id="doctor-register-form">
+            <div class="form-group">
+                <label class="form-label">Full Name with Title</label>
+                <input type="text" id="reg-name" class="form-input" placeholder="e.g. Dr. Selam Aklilu" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Primary Specialty</label>
+                <select id="reg-specialty" class="form-input select-input" required>
+                    <option value="">Select Specialty...</option>
+                    <option value="General Practitioner">General Practitioner</option>
+                    <option value="Spine & Posture">Spine & Posture</option>
+                    <option value="Maternal Wellness">Maternal Wellness</option>
+                    <option value="Ancestral Nutrition">Ancestral Nutrition</option>
+                    <option value="Physiotherapist">Physiotherapist</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Treatment Options Offered</label>
+                <select id="reg-treatments" class="form-input select-input" multiple required style="height:80px;">
+                    <option value="Telehealth">Telehealth</option>
+                    <option value="Clinic Visit">Clinic Visit</option>
+                    <option value="In-Home Care">In-Home Care</option>
+                </select>
+                <div style="font-size:10px; color:var(--color-text-secondary); margin-top:4px;">Hold Ctrl/Cmd to select multiple</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Upload Medical License / Guidelines (PDF, TXT)</label>
+                <div class="file-upload" id="file-dropzone">
+                    <span style="font-size: 32px; display:block; margin-bottom:10px;">📄</span>
+                    <span style="font-weight: 600; color: #fff;">Click to select or drag & drop</span>
+                    <p style="font-size: 11px; margin-top: 5px;">PDF, DOC, or TXT (Max 5MB)</p>
+                    <input type="file" id="reg-file" accept=".txt,.pdf,.doc,.docx" style="display:none;" required>
+                </div>
+                <div id="file-name" style="font-size:14px; font-weight: 600; color:var(--color-success); text-align:center;"></div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="btn-submit-reg" style="margin-top:20px; font-size: 16px; padding: 16px;">🔒 Submit for Verification</button>
+        </form>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('doctor-register-form');
+            const fileInput = document.getElementById('reg-file');
+            const dropzone = document.getElementById('file-dropzone');
+            const fileNameDisplay = document.getElementById('file-name');
+            const statusMsg = document.getElementById('status-message');
+
+            let tgUserId = null;
+            let tgUsername = null;
+
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                tgUserId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+                tgUsername = window.Telegram.WebApp.initDataUnsafe.user.username;
+            } else {
+                const urlParams = new URLSearchParams(window.location.search);
+                tgUserId = urlParams.get('user_id') || 'test_doc_' + Math.floor(Math.random()*10000);
+            }
+
+            dropzone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    fileNameDisplay.innerHTML = `✓ ${fileInput.files[0].name} attached`;
+                }
+            });
+
+            async function extractTextFromFile(file) {
+                return new Promise((resolve, reject) => {
+                    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                        const reader = new FileReader();
+                        reader.onload = async function() {
+                            const typedarray = new Uint8Array(this.result);
+                            try {
+                                const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                                let fullText = '';
+                                for (let i = 1; i <= pdf.numPages; i++) {
+                                    const page = await pdf.getPage(i);
+                                    const textContent = await page.getTextContent();
+                                    fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+                                }
+                                resolve(fullText);
+                            } catch (e) {
+                                reject(e);
+                            }
+                        };
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        // Treat as text
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsText(file);
+                    }
+                });
+            }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('btn-submit-reg');
+                btn.disabled = true;
+                btn.textContent = 'Processing Document...';
+
+                const name = document.getElementById('reg-name').value;
+                const specialty = document.getElementById('reg-specialty').value;
+                const treatmentsSelect = document.getElementById('reg-treatments');
+                const treatments = Array.from(treatmentsSelect.selectedOptions).map(opt => opt.value);
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    alert('Please upload an official PDF or TXT document.');
+                    btn.disabled = false;
+                    btn.textContent = '🔒 Submit for Verification';
+                    return;
+                }
+
+                try {
+                    const extractedContent = await extractTextFromFile(file);
+
+                    btn.textContent = 'Submitting...';
+                    const res = await fetch('/api/doctor/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            telegramId: tgUserId,
+                            username: tgUsername,
+                            firstName: name,
+                            specialty: specialty,
+                            treatmentOptions: treatments,
+                            docTitle: file.name,
+                            docContent: extractedContent
+                        })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok) {
+                        form.style.display = 'none';
+                        statusMsg.style.display = 'block';
+                        statusMsg.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                        statusMsg.style.color = 'var(--color-success)';
+                        statusMsg.style.border = '1px solid var(--color-success)';
+                        statusMsg.innerHTML = '<h2>🎉 Registration Complete!</h2><p style="margin-top:10px;">Your credentials have been securely transmitted to the Admin portal for verification. You will gain access to the Doctor Dashboard immediately upon approval.</p>';
+                    } else {
+                        throw new Error(data.error || 'Registration failed');
+                    }
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                    btn.disabled = false;
+                    btn.textContent = '🔒 Submit for Verification';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

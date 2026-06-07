@@ -13,6 +13,61 @@ import { ConsultationStatus } from '@prisma/client';
 
 const router = Router();
 
+// Doctor Registration (Public endpoint for onboarding)
+router.post('/register', async (req, res) => {
+  try {
+    const { telegramId, username, firstName, specialty, treatmentOptions, docTitle, docContent } = req.body;
+
+    if (!telegramId || !firstName || !specialty || !docTitle || !docContent) {
+      return res.status(400).json({ error: 'Missing required registration fields' });
+    }
+
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Check if user exists
+    let tId = telegramId.toString().startsWith('test') ? BigInt(Math.floor(Math.random() * 1000000)) : BigInt(telegramId);
+    let user = await prisma.user.findUnique({ where: { telegramId: tId } });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          telegramId: tId,
+          username,
+          firstName,
+          role: 'CLINICIAN',
+          isVerifiedClinician: false,
+          specialty,
+          treatmentOptions: treatmentOptions || []
+        }
+      });
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          role: 'CLINICIAN',
+          isVerifiedClinician: false, // Reset verification status
+          specialty,
+          treatmentOptions: treatmentOptions || []
+        }
+      });
+    }
+
+    // Save document
+    await prisma.clinicianDocument.create({
+      data: {
+        userId: user.id,
+        title: docTitle,
+        content: docContent
+      }
+    });
+
+    res.status(201).json({ success: true, message: 'Registration submitted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
 // Middleware to mock authentication for testing
 // In a real app, this would use JWT or session
 const mockAuth = (req: any, res: any, next: any) => {
@@ -265,6 +320,25 @@ router.put('/consultations/:sessionId/status', async (req, res) => {
 });
 
 // ==================== AVAILABILITY ROUTES ====================
+
+// Bulk overwrite availability calendar
+router.post('/availability/bulk', async (req, res) => {
+  try {
+    const doctorId = (req as any).user?.id;
+    if (!doctorId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { slots } = req.body;
+    await doctorService.bulkUpdateAvailability(doctorId, slots);
+    
+    // Broadcast via socket.io that this doctor's calendar changed
+    const { io } = await import('../../server.js');
+    io.to(`doc_${doctorId}`).emit('calendar_updated', doctorId);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Set availability slot
 router.post('/availability', async (req, res) => {

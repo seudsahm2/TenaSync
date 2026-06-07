@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - TenaSync</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <style>
+        .admin-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .doctor-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .doc-details p {
+            font-size: 13px;
+            margin: 4px 0;
+            color: var(--color-text-secondary);
+        }
+        .doc-file {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #A78BFA;
+            margin: 10px 0;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="app-logo"><span>ጤና</span>-Sync Admin</div>
+        <div class="app-subtitle">Security & Verification Gateway</div>
+    </header>
+
+    <div class="container">
+        <div class="glass-panel" style="margin-top: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:20px;">
+                <h2 style="margin:0; font-size:18px;">🛡️ Control Panel</h2>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:12px; color:var(--color-text-secondary);">Admin Registration:</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-admin-reg">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <p style="font-size:12px; color:var(--color-text-secondary); text-align:center; margin-bottom:24px;">
+                Review and verify incoming clinician registrations. Make sure to thoroughly check uploaded credentials.
+            </p>
+
+            <div id="pending-doctors-list">
+                <p style="text-align:center; color:var(--color-text-secondary);">Loading pending verifications...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const listContainer = document.getElementById('pending-doctors-list');
+
+            async function loadPending() {
+                listContainer.innerHTML = '<p>Loading pending verifications...</p>';
+                try {
+                    const res = await fetch('/api/admin/pending-doctors');
+                    const json = await res.json();
+                    
+                    if (!json.success || json.data.length === 0) {
+                        listContainer.innerHTML = '<p style="color:var(--color-success);">✅ No pending doctor verifications.</p>';
+                        return;
+                    }
+
+                    listContainer.innerHTML = '';
+                    json.data.forEach(doc => {
+                        const fileContent = doc.documents.length > 0 ? doc.documents[0].content : 'No document uploaded.';
+                        
+                        const card = document.createElement('div');
+                        card.className = 'doctor-card';
+                        card.innerHTML = `
+                            <div class="doc-header">
+                                <h3 style="margin:0; font-size:18px;">${doc.firstName}</h3>
+                                <span class="badge-amber" style="padding:4px 8px; font-size:11px; border-radius:12px;">Pending</span>
+                            </div>
+                            <div class="doc-details">
+                                <p><strong>Telegram Handle:</strong> @${doc.username || 'N/A'}</p>
+                                <p><strong>Specialty:</strong> ${doc.specialty}</p>
+                                <p><strong>Treatments:</strong> ${(doc.treatmentOptions || []).join(', ')}</p>
+                                <p style="margin-top:10px; color:#fff;"><strong>Medical License / Credential Document:</strong></p>
+                                <div class="doc-file">${fileContent}</div>
+                            </div>
+                            <div style="display:flex; gap:10px; margin-top:15px;">
+                                <button class="btn btn-danger" onclick="window.rejectDoctor('${doc.id}')">Reject</button>
+                                <button class="btn btn-primary" style="background:#10B981;" onclick="window.approveDoctor('${doc.id}')">Verify & Approve</button>
+                            </div>
+                        `;
+                        listContainer.appendChild(card);
+                    });
+                } catch (err) {
+                    listContainer.innerHTML = `<p style="color:var(--color-danger);">Failed to load data: ${err.message}</p>`;
+                }
+            }
+
+            window.approveDoctor = async (id) => {
+                if(!confirm("Are you sure you want to approve this clinician?")) return;
+                await fetch(`/api/admin/approve-doctor/${id}`, { method: 'POST' });
+                loadPending();
+            };
+
+            window.rejectDoctor = async (id) => {
+                if(!confirm("Are you sure you want to reject this clinician?")) return;
+                await fetch(`/api/admin/reject-doctor/${id}`, { method: 'POST' });
+                loadPending();
+            };
+
+            const toggleAdminReg = document.getElementById('toggle-admin-reg');
+            
+            async function loadAdminStatus() {
+                const res = await fetch('/api/admin/status');
+                const json = await res.json();
+                toggleAdminReg.checked = json.isOpen;
+            }
+
+            toggleAdminReg.addEventListener('change', async (e) => {
+                const isOpen = e.target.checked;
+                await fetch('/api/admin/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isOpen })
+                });
+            });
+
+            loadPending();
+            loadAdminStatus();
+        });
+    </script>
+</body>
+</html>
+

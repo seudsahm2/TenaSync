@@ -108,6 +108,14 @@ class AIAssistantWidget {
     this.addMessage(text, true);
     this.symptomInput.value = '';
 
+    // Get patient user ID to send for context
+    const urlParams = new URLSearchParams(window.location.search);
+    let tgUserId = urlParams.get('user_id');
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+      tgUserId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+    }
+    const userId = tgUserId || localStorage.getItem('webFallbackId') || '';
+
     const typingMsg = document.createElement('div');
     typingMsg.classList.add('message', 'ai-message');
     typingMsg.textContent = 'Thinking...';
@@ -120,7 +128,7 @@ class AIAssistantWidget {
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symptoms: contextStr })
+        body: JSON.stringify({ symptoms: contextStr, userId })
       });
 
       const result = await response.json();

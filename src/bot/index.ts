@@ -39,28 +39,131 @@ setupBusinessMessageHandler(bot);
 
 // 3. Setup Basic DM Command Handlers
 bot.command('start', async (ctx) => {
-  const userId = ctx.from?.id;
-  const username = ctx.from?.username || '';
-  const firstName = ctx.from?.first_name || 'User';
-
   const welcomeMessage =
     `👋 *Welcome to ጤና-Sync (TenaSync)*\n\n` +
     `An autonomous, decentralized, privacy-preserving somatic health marketplace in the Telegram Ecosystem.\n\n` +
-    `• If you are a *Patient*: Tap the button below to monitor your posture spine index, maternal reproductive recovery logs, and compile indigenous ancestral health remedies.\n\n` +
-    `• If you are a *Clinician*: Connect your bot via *Telegram Business > Chatbots* to automate your scheduling and front desk rate negotiations.`;
-
-  const webAppUrl = `${config.TMA_URL}/modules/patient/index.html?v=3&user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
+    `Please select your role to continue:`;
 
   await ctx.reply(welcomeMessage, {
     parse_mode: 'Markdown',
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '🔬 Open TenaSync Workspace (TMA)', web_app: { url: webAppUrl } }
+          { text: '🧑‍🦱 I am a Patient', callback_data: 'role_patient' },
+          { text: '👨‍⚕️ I am a Doctor / Clinician', callback_data: 'role_doctor' }
+        ],
+        [
+          { text: '🛡️ System Admin', callback_data: 'role_admin' }
         ]
       ]
     }
   });
+});
+
+bot.action('role_admin', async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: BigInt(userId) }
+    });
+
+    if (user && user.role === 'ADMIN') {
+      const adminUrl = `${config.TMA_URL}/modules/admin/index.html?v=1&user_id=${userId}`;
+      await ctx.editMessageText(`Welcome back, Admin. Tap below to access the Control Panel.`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🛡️ Open Admin Panel', web_app: { url: adminUrl } }]
+          ]
+        }
+      });
+    } else {
+      // Check if registration is open
+      const res = await fetch(`http://127.0.0.1:${config.PORT}/api/admin/status`);
+      const data = await res.json();
+      
+      if (data.isOpen) {
+        const username = ctx.from?.username || '';
+        const firstName = ctx.from?.first_name || 'Admin';
+        const regUrl = `${config.TMA_URL}/modules/admin/register.html?v=1&user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
+        await ctx.editMessageText(`Admin registration is currently OPEN.\n\nTap below to claim your Admin privileges.`, {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔑 Register as Admin', web_app: { url: regUrl } }]
+            ]
+          }
+        });
+      } else {
+        await ctx.editMessageText(`⛔ You are not an Admin. Admin registration is currently closed.`);
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    await ctx.answerCbQuery('Error connecting to database');
+  }
+});
+
+bot.action('role_patient', async (ctx) => {
+  const userId = ctx.from?.id;
+  const username = ctx.from?.username || '';
+  const firstName = ctx.from?.first_name || 'User';
+
+  const webAppUrl = `${config.TMA_URL}/modules/patient/index.html?v=3&user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
+
+  await ctx.editMessageText(`Welcome to the Patient Portal. Tap below to access your workspace.`, {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '🔬 Open Patient Workspace (TMA)', web_app: { url: webAppUrl } }
+        ]
+      ]
+    }
+  });
+});
+
+bot.action('role_doctor', async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: BigInt(userId) }
+    });
+
+    if (user && user.role === 'CLINICIAN') {
+      if (user.isVerifiedClinician) {
+        // Verified doctor - send to dashboard
+        const dashboardUrl = `${config.TMA_URL}/modules/doctor/views/dashboard.html?v=1&user_id=${userId}`;
+        await ctx.editMessageText(`Welcome back, Dr. ${user.firstName}. Tap below to access your dashboard.`, {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '👨‍⚕️ Open Doctor Dashboard', web_app: { url: dashboardUrl } }]
+            ]
+          }
+        });
+      } else {
+        // Pending approval
+        await ctx.editMessageText(`⏳ Your clinician registration is currently pending Admin review. We will notify you once approved.`);
+      }
+    } else {
+      // Not a clinician - send to registration form
+      const username = ctx.from?.username || '';
+      const firstName = ctx.from?.first_name || 'Doctor';
+      const registerUrl = `${config.TMA_URL}/modules/doctor/register.html?v=1&user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
+      
+      await ctx.editMessageText(`You are not registered as a Clinician yet.\n\nTap below to fill out the verification form and upload your credentials.`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📋 Register as Clinician', web_app: { url: registerUrl } }]
+          ]
+        }
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    await ctx.answerCbQuery('Error connecting to database');
+  }
 });
 
 bot.command('help', async (ctx) => {
@@ -132,3 +235,4 @@ bot.on('document', async (ctx) => {
 bot.catch((err, ctx) => {
   console.error(`❌ Telegraf Bot Error for update type: ${ctx.updateType}`, err);
 });
+

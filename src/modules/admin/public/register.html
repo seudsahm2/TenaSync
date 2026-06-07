@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Registration - TenaSync</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        .register-container {
+            max-width: 400px;
+            margin: 40px auto;
+            padding: 30px;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="app-logo"><span>ጤና</span>-Sync Admin</div>
+        <div class="app-subtitle">Root Access Provisioning</div>
+    </header>
+
+    <div class="container">
+        <div class="glass-panel register-container">
+            <h2 style="text-align:center; margin-bottom:10px;">🔑 Claim Admin Role</h2>
+            <p style="font-size:12px; color:var(--color-text-secondary); text-align:center; margin-bottom:20px;">
+                You are about to register as a System Administrator. This will grant you access to verify doctors and manage the platform.
+            </p>
+
+            <button class="btn btn-primary" id="btn-claim" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">Grant Privileges</button>
+            <div id="status-message" style="display:none; padding:15px; border-radius:8px; margin-top:20px; text-align:center; font-size:14px; font-weight:600;"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('btn-claim');
+            const statusMsg = document.getElementById('status-message');
+
+            let tgUserId = null;
+            let tgUsername = null;
+            let firstName = 'Admin';
+
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                tgUserId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+                tgUsername = window.Telegram.WebApp.initDataUnsafe.user.username;
+                firstName = window.Telegram.WebApp.initDataUnsafe.user.first_name;
+            } else {
+                const urlParams = new URLSearchParams(window.location.search);
+                tgUserId = urlParams.get('user_id') || 'test_admin_' + Math.floor(Math.random()*1000);
+            }
+
+            btn.addEventListener('click', async () => {
+                btn.disabled = true;
+                btn.textContent = 'Processing...';
+
+                try {
+                    const res = await fetch('/api/admin/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ telegramId: tgUserId, firstName, username: tgUsername })
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        btn.style.display = 'none';
+                        statusMsg.style.display = 'block';
+                        statusMsg.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                        statusMsg.style.color = 'var(--color-success)';
+                        statusMsg.style.border = '1px solid var(--color-success)';
+                        statusMsg.innerHTML = '✅ Registration Successful!<br><br>Redirecting you to the Admin Dashboard...';
+                        
+                        // Auto-redirect to the admin dashboard
+                        setTimeout(() => {
+                            window.location.href = `index.html?user_id=${tgUserId}`;
+                        }, 1500);
+                    } else {
+                        throw new Error(data.error || 'Failed');
+                    }
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Grant Privileges';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

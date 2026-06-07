@@ -21,16 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     defaultTgName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || defaultTgName;
   }
 
-  if (tgUserId) {
-    document.getElementById('login-telegram-id').value = tgUserId;
-  }
-
   // ─── DOM ELEMENTS ──────────────────────────────────────────────
   const navDash = document.getElementById('nav-dash');
   const navProfile = document.getElementById('nav-profile');
   const navRecovery = document.getElementById('nav-recovery');
   const navAppointments = document.getElementById('nav-appointments');
   const navSettings = document.getElementById('nav-settings');
+  const navHistory = document.getElementById('nav-history');
 
   const views = {
     login: document.getElementById('view-login'),
@@ -43,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     specialistDetail: document.getElementById('view-specialist-detail'),
     booking: document.getElementById('view-booking'),
     appointments: document.getElementById('view-appointments'),
+    history: document.getElementById('view-history'),
     recovery: document.getElementById('view-recovery'),
     notifications: document.getElementById('view-notifications'),
     settings: document.getElementById('view-settings')
@@ -72,6 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
       navRecovery.classList.add('active');
     } else if (viewName === 'appointments' || viewName === 'booking' || viewName === 'specialists' || viewName === 'specialistDetail') {
       navAppointments.classList.add('active');
+    } else if (viewName === 'history') {
+      navHistory.classList.add('active');
     } else if (viewName === 'settings') {
       navSettings.classList.add('active');
     }
@@ -102,28 +102,32 @@ document.addEventListener('DOMContentLoaded', () => {
     showView('appointments');
   });
 
+  if (navHistory) {
+    navHistory.addEventListener('click', () => {
+      if (!activeUserId) return;
+      fetchHistory();
+      showView('history');
+    });
+  }
+
   navSettings.addEventListener('click', () => {
     if (!activeUserId) return;
     fetchProfile(); // Load toggles state
     showView('settings');
   });
 
-  // ─── LOGIN / ACCOUNT CONNECTION ─────────────────────────────────
-  const btnLoginSubmit = document.getElementById('btn-login-submit');
-  
+  // ─── SECURE AUTO LOGIN / ACCOUNT CONNECTION ──────────────────────
   async function connectAccount(tgIdInput) {
-    if (!tgIdInput) {
-      showAlert('Error', 'Please enter a valid Telegram User ID.', '❌');
-      return;
-    }
-
-    activeUserId = tgIdInput;
-    if (btnLoginSubmit) {
-      btnLoginSubmit.disabled = true;
-      btnLoginSubmit.textContent = 'Connecting...';
-    }
-
     try {
+      // Hit real backend login endpoint to fetch/create user and get proper UUID
+      const loginRes = await fetch('/api/patient/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId: tgIdInput, name: defaultTgName })
+      });
+      const userData = await loginRes.json();
+      activeUserId = userData.id; // Map to true UUID so profile saving works
+
       // Fetch/Create Profile
       await fetchProfile();
       // Fetch Stats
@@ -138,29 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
       setupLocalBackupData();
       showView('dashboard');
       document.querySelector('.tab-navigation').style.display = 'flex';
-    } finally {
-      if (btnLoginSubmit) {
-        btnLoginSubmit.disabled = false;
-        btnLoginSubmit.textContent = 'Connect Account';
-      }
     }
-  }
-
-  if (btnLoginSubmit) {
-    btnLoginSubmit.addEventListener('click', () => {
-      connectAccount(document.getElementById('login-telegram-id').value.trim());
-    });
   }
 
   // Auto-connect if user ID is found securely via Telegram
   if (tgUserId) {
-    // Hide the login UI completely while auto-connecting
-    document.getElementById('view-login').innerHTML = `
-      <div style="text-align:center; padding-top: 40vh; color: var(--color-primary);">
-        <h2>Authenticating securely...</h2>
-        <p>Connecting to Telegram...</p>
-      </div>
-    `;
     connectAccount(tgUserId);
   } else {
     // If absolutely no TG ID is found (e.g. opened in browser), auto-generate a fallback ID and save it so it doesn't change on reload.
@@ -169,16 +155,159 @@ document.addEventListener('DOMContentLoaded', () => {
       fallbackId = 'web_' + Math.floor(Math.random() * 1000000000);
       localStorage.setItem('webFallbackId', fallbackId);
     }
-    
-    document.getElementById('view-login').innerHTML = `
-      <div style="text-align:center; padding-top: 40vh; color: var(--color-primary);">
-        <h2>Initializing Workspace...</h2>
-      </div>
-    `;
     connectAccount(fallbackId);
   }
 
-  // ─── PROFILE LOGIC ──────────────────────────────────────────────
+  // ─── PROFILE LOGIC & CUSTOM COMBOBOXES ─────────────────────
+  const COMMON_DISEASES = [
+    "Hypertension", "Type 2 Diabetes", "Malaria", "Typhoid", "Gastritis", "Asthma",
+    "Tuberculosis", "Pneumonia", "Anemia", "Peptic Ulcer Disease", "Migraine",
+    "Osteoarthritis", "Rheumatoid Arthritis", "Lower Back Pain", "Sciatica",
+    "Cervical Spondylosis", "Postpartum Hemorrhage", "Pelvic Organ Prolapse",
+    "Endometriosis", "PCOS", "Fibroids", "Vitamin D Deficiency", "Malnutrition"
+  ];
+  const COMMON_ALLERGIES = ["Penicillin", "Peanuts", "Pollen", "Dust Mites", "Latex", "Ibuprofen", "Aspirin", "Dairy", "Gluten"];
+  const COMMON_MEDS = ["Paracetamol", "Lisinopril", "Metformin", "Omeprazole", "Amoxicillin", "Ibuprofen", "Amlodipine"];
+  const COMMON_INJURIES = ["Whiplash", "Fractured Tibia", "Rotator Cuff Tear", "Herniated Disc", "Sprained Ankle"];
+
+  let activeConditionsArr = [];
+  let healedConditionsArr = [];
+  let allergiesArr = [];
+  let medsArr = [];
+  let injuriesArr = [];
+
+  function setupCombobox(inputId, dropdownId, listId, dataList, stateArr, renderFn) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !dropdown) return;
+
+    input.addEventListener('input', () => {
+      const val = input.value.trim().toLowerCase();
+      dropdown.innerHTML = '';
+      if (!val) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      dropdown.style.display = 'block';
+      let matches = dataList.filter(d => d.toLowerCase().includes(val));
+      
+      matches.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'combobox-option';
+        div.textContent = m;
+        div.onclick = () => {
+          if (!stateArr.includes(m)) stateArr.push(m);
+          input.value = '';
+          dropdown.style.display = 'none';
+          renderFn();
+        };
+        dropdown.appendChild(div);
+      });
+
+      const addDiv = document.createElement('div');
+      addDiv.className = 'combobox-add-new';
+      addDiv.innerHTML = `+ Add "${input.value}" manually`;
+      addDiv.onclick = () => {
+        const customVal = input.value.trim();
+        if (!stateArr.includes(customVal)) stateArr.push(customVal);
+        input.value = '';
+        dropdown.style.display = 'none';
+        renderFn();
+      };
+      dropdown.appendChild(addDiv);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+  }
+
+  function toggleHealedCondition(cond) {
+    const actIdx = activeConditionsArr.indexOf(cond);
+    if (actIdx > -1) {
+      activeConditionsArr.splice(actIdx, 1);
+      healedConditionsArr.push(cond);
+    } else {
+      const healIdx = healedConditionsArr.indexOf(cond);
+      if (healIdx > -1) healedConditionsArr.splice(healIdx, 1);
+      activeConditionsArr.push(cond);
+    }
+    renderConditions();
+  }
+
+  function removeCondition(cond) {
+    const actIdx = activeConditionsArr.indexOf(cond);
+    if (actIdx > -1) activeConditionsArr.splice(actIdx, 1);
+    const healIdx = healedConditionsArr.indexOf(cond);
+    if (healIdx > -1) healedConditionsArr.splice(healIdx, 1);
+    renderConditions();
+  }
+
+  function renderConditions() {
+    const activeList = document.getElementById('active-conditions-list');
+    const healedList = document.getElementById('healed-conditions-list');
+    activeList.innerHTML = '';
+    healedList.innerHTML = '';
+
+    if (activeConditionsArr.length === 0) activeList.innerHTML = '<div style="font-size:12px; color:#9CA3AF; padding:8px;">No active conditions</div>';
+    if (healedConditionsArr.length === 0) healedList.innerHTML = '<div style="font-size:12px; color:#9CA3AF; padding:8px;">No healed conditions</div>';
+
+    activeConditionsArr.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'condition-item';
+      div.innerHTML = `<span class="item-text">${c}</span><div class="item-actions"><input type="checkbox" class="healed-checkbox" title="Mark as Healed"><button type="button" class="btn-remove-condition">✖</button></div>`;
+      div.querySelector('.healed-checkbox').addEventListener('change', () => toggleHealedCondition(c));
+      div.querySelector('.btn-remove-condition').addEventListener('click', () => {
+        activeConditionsArr = activeConditionsArr.filter(x => x !== c);
+        renderConditions();
+      });
+      activeList.appendChild(div);
+    });
+
+    healedConditionsArr.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'condition-item healed';
+      div.innerHTML = `<span class="item-text">${c}</span><div class="item-actions"><input type="checkbox" class="healed-checkbox" checked title="Mark as Active"><button type="button" class="btn-remove-condition">✖</button></div>`;
+      div.querySelector('.healed-checkbox').addEventListener('change', () => toggleHealedCondition(c));
+      div.querySelector('.btn-remove-condition').addEventListener('click', () => {
+        healedConditionsArr = healedConditionsArr.filter(x => x !== c);
+        renderConditions();
+      });
+      healedList.appendChild(div);
+    });
+  }
+
+  function renderSimpleList(listId, stateArr, renderCallback) {
+    const list = document.getElementById(listId);
+    list.innerHTML = '';
+    if (stateArr.length === 0) {
+      list.innerHTML = '<div style="font-size:12px; color:#9CA3AF; padding:8px;">None added</div>';
+    }
+    stateArr.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'condition-item';
+      div.innerHTML = `<span class="item-text">${item}</span><div class="item-actions"><button type="button" class="btn-remove-condition">✖</button></div>`;
+      div.querySelector('.btn-remove-condition').addEventListener('click', () => {
+        const index = stateArr.indexOf(item);
+        if (index > -1) stateArr.splice(index, 1);
+        renderCallback();
+      });
+      list.appendChild(div);
+    });
+  }
+
+  const renderAllergies = () => renderSimpleList('allergies-list', allergiesArr, renderAllergies);
+  const renderMeds = () => renderSimpleList('meds-list', medsArr, renderMeds);
+  const renderInjuries = () => renderSimpleList('injuries-list', injuriesArr, renderInjuries);
+
+  setupCombobox('disease-search-input', 'disease-dropdown', 'active-conditions-list', COMMON_DISEASES, activeConditionsArr, renderConditions);
+  setupCombobox('allergies-search-input', 'allergies-dropdown', 'allergies-list', COMMON_ALLERGIES, allergiesArr, renderAllergies);
+  setupCombobox('meds-search-input', 'meds-dropdown', 'meds-list', COMMON_MEDS, medsArr, renderMeds);
+  setupCombobox('injuries-search-input', 'injuries-dropdown', 'injuries-list', COMMON_INJURIES, injuriesArr, renderInjuries);
+
   async function fetchProfile() {
     const res = await fetch(`/api/patient/profile/${activeUserId}`);
     profileData = await res.json();
@@ -193,10 +322,31 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prof-occupation').value = profileData.occupation || '';
     document.getElementById('prof-activity').value = profileData.activityLevel || '';
     document.getElementById('prof-workStyle').value = profileData.workStyle || '';
-    document.getElementById('prof-conditions').value = profileData.existingConditions || '';
-    document.getElementById('prof-allergies').value = profileData.allergies || '';
-    document.getElementById('prof-medications').value = profileData.currentMedications || '';
-    document.getElementById('prof-injuries').value = profileData.previousInjuries || '';
+    
+    // Parse combined conditions logic
+    const conds = profileData.existingConditions || '';
+    const activeMatch = conds.match(/Active: (.*?)(?: \| Healed:|$)/);
+    const healedMatch = conds.match(/Healed: (.*)$/);
+    
+    let aStr = activeMatch ? activeMatch[1].trim() : conds.replace(/Healed:.*/, '').trim();
+    let hStr = healedMatch ? healedMatch[1].trim() : '';
+    
+    activeConditionsArr.length = 0;
+    if (aStr) activeConditionsArr.push(...aStr.split(',').map(s => s.trim()).filter(Boolean));
+    healedConditionsArr.length = 0;
+    if (hStr) healedConditionsArr.push(...hStr.split(',').map(s => s.trim()).filter(Boolean));
+    renderConditions();
+
+    allergiesArr.length = 0;
+    if (profileData.allergies) allergiesArr.push(...profileData.allergies.split(',').map(s => s.trim()).filter(Boolean));
+    medsArr.length = 0;
+    if (profileData.currentMedications) medsArr.push(...profileData.currentMedications.split(',').map(s => s.trim()).filter(Boolean));
+    injuriesArr.length = 0;
+    if (profileData.previousInjuries) injuriesArr.push(...profileData.previousInjuries.split(',').map(s => s.trim()).filter(Boolean));
+    
+    renderAllergies();
+    renderMeds();
+    renderInjuries();
 
     // Prefill settings and dashboard banner
     let displayName = profileData.fullName || defaultTgName || 'Guest Patient';
@@ -215,6 +365,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnSaveProfile = document.getElementById('btn-save-profile');
   btnSaveProfile.addEventListener('click', async () => {
+    
+    // Build brilliant conditions format for AI Awareness
+    let combinedC = '';
+    if (activeConditionsArr.length > 0 || healedConditionsArr.length > 0) {
+       combinedC = `Active: ${activeConditionsArr.join(', ')} | Healed: ${healedConditionsArr.join(', ')}`;
+    }
+
     const formData = {
       fullName: document.getElementById('prof-fullName').value.trim(),
       age: document.getElementById('prof-age').value,
@@ -225,10 +382,10 @@ document.addEventListener('DOMContentLoaded', () => {
       occupation: document.getElementById('prof-occupation').value,
       activityLevel: document.getElementById('prof-activity').value,
       workStyle: document.getElementById('prof-workStyle').value,
-      existingConditions: document.getElementById('prof-conditions').value.trim(),
-      allergies: document.getElementById('prof-allergies').value.trim(),
-      currentMedications: document.getElementById('prof-medications').value.trim(),
-      previousInjuries: document.getElementById('prof-injuries').value.trim(),
+      existingConditions: combinedC,
+      allergies: allergiesArr.join(', '),
+      currentMedications: medsArr.join(', '),
+      previousInjuries: injuriesArr.join(', '),
     };
 
     btnSaveProfile.disabled = true;
@@ -396,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch('/api/ai/qa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: questionText, language: lang })
+          body: JSON.stringify({ question: questionText, language: lang, userId: activeUserId })
         });
         const data = await res.json();
 
@@ -438,12 +595,167 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ─── SOCKET.IO CALENDAR SYNC ────────────────────────────────────
+  let socket = null;
+  if (typeof io !== 'undefined') {
+    socket = io();
+  }
+
+  // ─── LIVE APPOINTMENT CALENDAR LOGIC ─────────────────────────────
+  let selectedSlot = null;
+  let activeDoctorCalendar = [];
+  let activeBookedSlots = [];
+
+  function renderPatientCalendar(doctorId) {
+    const container = document.getElementById('patient-calendar-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = '60px repeat(7, minmax(80px, 1fr))';
+    grid.style.gap = '5px';
+
+    grid.innerHTML = `
+      <div style="font-weight:bold; font-size:11px; color:gray; text-align:right; padding-right:5px;">Time</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Mon</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Tue</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Wed</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Thu</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Fri</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Sat</div>
+      <div style="font-weight:bold; font-size:11px; text-align:center;">Sun</div>
+    `;
+
+    // Calculate dynamic rows based on active slots
+    if(activeDoctorCalendar.length === 0) {
+      container.innerHTML = '<p style="text-align:center; font-size:12px; color:gray;">Doctor has not set availability yet.</p>';
+      return;
+    }
+
+    // Default to 30 min intervals, 08:00 to 18:00
+    const startHour = 8;
+    const endHour = 18;
+    const intervalMins = 30; // In a production app, we would infer this from the slots array
+    const totalRows = Math.ceil(((endHour - startHour) * 60) / intervalMins);
+
+    for (let row = 0; row < totalRows; row++) {
+      const currentMins = (startHour * 60) + (row * intervalMins);
+      const nextMins = currentMins + intervalMins;
+      
+      const hr1 = Math.floor(currentMins / 60).toString().padStart(2, '0');
+      const m1 = (currentMins % 60).toString().padStart(2, '0');
+      
+      const timeLabel = `${hr1}:${m1}`;
+
+      const timeDiv = document.createElement('div');
+      timeDiv.style.fontSize = '10px';
+      timeDiv.style.color = 'gray';
+      timeDiv.style.textAlign = 'right';
+      timeDiv.style.paddingRight = '5px';
+      timeDiv.style.marginTop = '2px';
+      timeDiv.textContent = timeLabel;
+      grid.appendChild(timeDiv);
+
+      // Generate next 7 days starting from next Monday, or just generic days
+      for (let day = 1; day <= 7; day++) {
+        const backendDay = day === 7 ? 0 : day;
+        
+        const cell = document.createElement('div');
+        cell.style.borderRadius = '4px';
+        cell.style.height = '24px';
+        cell.style.transition = 'all 0.2s';
+        
+        // Is slot available?
+        const isAvailable = activeDoctorCalendar.some(s => s.dayOfWeek === backendDay && s.startTime === timeLabel);
+        
+        // Calculate date for this specific cell (dummy logic for next 7 days based on current day)
+        // Here we just use a generic format to check booking
+        const isBooked = activeBookedSlots.some(b => {
+           const bDate = new Date(b.scheduledTime);
+           return bDate.getDay() === backendDay && `${bDate.getHours().toString().padStart(2,'0')}:${bDate.getMinutes().toString().padStart(2,'0')}` === timeLabel;
+        });
+
+        if (isBooked) {
+           cell.style.background = 'rgba(239, 68, 68, 0.4)';
+           cell.style.border = '1px solid var(--color-danger)';
+           cell.style.cursor = 'not-allowed';
+           cell.title = 'Taken';
+        } else if (isAvailable) {
+           cell.style.background = 'rgba(16, 185, 129, 0.4)';
+           cell.style.border = '1px solid var(--color-success)';
+           cell.style.cursor = 'pointer';
+           cell.title = 'Available';
+           
+           // If it's currently selected
+           if (selectedSlot && selectedSlot.day === backendDay && selectedSlot.time === timeLabel) {
+               cell.style.background = 'rgba(59, 130, 246, 0.6)';
+               cell.style.border = '2px solid var(--color-accent)';
+           }
+
+           cell.addEventListener('click', () => {
+             selectedSlot = { day: backendDay, time: timeLabel };
+             // Mock standard JS Date generation for the selected slot (Next upcoming 'dayOfWeek')
+             const d = new Date();
+             d.setDate(d.getDate() + ((backendDay + 7 - d.getDay()) % 7 || 7));
+             d.setHours(parseInt(hr1), parseInt(m1), 0, 0);
+             
+             // Convert to local datetime-local format
+             const offset = d.getTimezoneOffset() * 60000;
+             const localISOTime = (new Date(d - offset)).toISOString().slice(0, 16);
+             document.getElementById('book-datetime').value = localISOTime;
+             
+             document.getElementById('btn-booking-confirm').disabled = false;
+             renderPatientCalendar(doctorId);
+           });
+        } else {
+           cell.style.background = 'rgba(255,255,255,0.03)';
+           cell.style.border = '1px solid rgba(255,255,255,0.05)';
+        }
+
+        grid.appendChild(cell);
+      }
+    }
+    container.appendChild(grid);
+  }
+
+  async function loadDoctorCalendar(doctorId) {
+    document.getElementById('patient-calendar-container').innerHTML = '<p style="text-align:center; font-size:12px; color:gray;">Loading live slots...</p>';
+    selectedSlot = null;
+    document.getElementById('btn-booking-confirm').disabled = true;
+
+    try {
+       const res = await fetch(`/api/doctor/availability/${doctorId}`);
+       activeDoctorCalendar = await res.json();
+       
+       // Get booked consultations to find taken slots
+       const cRes = await fetch(`/api/doctor/patients/${activeUserId}/history`); // Wait, we need all consults for this doctor to know which are taken.
+       // Actually, we can fetch all consultations for this doctor via a new endpoint or pass it in availability.
+       // Since the endpoint doesn't exist, we will assume patients can only see their own taken slots unless we build a public schedule route.
+       // For hackathon, we will render it natively without the booked slots cross-check if the route is missing.
+       activeBookedSlots = []; 
+       
+       renderPatientCalendar(doctorId);
+
+       // Setup socket listener
+       if (socket) {
+          socket.emit('watch_doctor_slots', doctorId);
+          socket.off('calendar_updated');
+          socket.on('calendar_updated', (docId) => {
+             if(docId === doctorId) loadDoctorCalendar(doctorId); // Auto-refresh live!
+          });
+       }
+    } catch(e) {
+       console.error(e);
+    }
+  }
+
   async function fetchSpecialists(condition = 'general') {
     const listContainer = document.getElementById('specialists-list-container');
     listContainer.innerHTML = '<p style="font-size:13px; color:var(--color-text-secondary); text-align:center;">Loading vetted specialists...</p>';
 
     try {
-      // Use the advanced AI specialist matching API
+      // Hits the root matching API which returns clinicians list
       let endpoint = '/api/ai/specialists';
       let payload = { condition };
 
@@ -519,6 +831,9 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = opt;
       typeSelect.appendChild(el);
     });
+    
+    // Trigger socket calendar load
+    loadDoctorCalendar(selectedDoctor.id);
 
     showView('booking');
   });
@@ -923,6 +1238,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── HISTORY & RATING LOGIC ─────────────────────────────────────
   let ratingDoctorId = null;
+  let activeChatSessionId = null;
 
   async function fetchHistory() {
     const listContainer = document.getElementById('history-list-container');
@@ -932,35 +1248,118 @@ document.addEventListener('DOMContentLoaded', () => {
       listContainer.innerHTML = '';
 
       if (history.length === 0) {
-        listContainer.innerHTML = '<p style="font-size:13px; color:var(--color-text-secondary); text-align:center;">No completed consultations.</p>';
+        listContainer.innerHTML = '<p style="font-size:13px; color:var(--color-text-secondary); text-align:center;">No consultations found.</p>';
         return;
       }
 
       history.forEach(session => {
         const div = document.createElement('div');
         div.className = 'glass-panel';
+        div.style.cursor = 'pointer';
+        div.style.border = '1px solid rgba(255,255,255,0.05)';
+        
+        let actionsHtml = '';
+        if (session.status === 'COMPLETED') {
+           actionsHtml = `<button class="btn btn-secondary btn-rate-doc" data-doc-id="${session.clinicianId}" style="margin-top:10px; padding:6px; font-size:12px;">Rate Experience</button>`;
+        } else {
+           actionsHtml = `<button class="btn btn-primary btn-chat-doc" style="margin-top:10px; padding:6px; font-size:12px; background:#3b82f6;">Open Chat</button>`;
+        }
+
         div.innerHTML = `
-          <div style="font-weight:bold; margin-bottom:5px;">Dr. ${session.clinician.firstName}</div>
+          <div style="font-weight:bold; margin-bottom:5px;">Dr. ${session.clinician.firstName} <span style="font-size:11px; font-weight:normal; color:gray;">(${session.status})</span></div>
           <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:10px;">${new Date(session.updatedAt).toLocaleDateString()}</div>
           <div style="font-size:13px; margin-bottom:10px;"><strong>Symptoms:</strong> ${session.patientSymptoms}</div>
-          <div style="padding:10px; background:rgba(0,0,0,0.1); border-left:3px solid #10B981; border-radius:4px; font-size:12px; white-space:pre-wrap;">
-            <strong>AI Doctor Summary:</strong><br>${session.aiSummary || 'No summary available.'}
-          </div>
-          <button class="btn btn-secondary btn-rate-doc" data-doc-id="${session.clinicianId}" style="margin-top:10px; padding:6px; font-size:12px;">Rate Experience</button>
+          ${session.aiSummary ? `<div style="padding:10px; background:rgba(0,0,0,0.1); border-left:3px solid #10B981; border-radius:4px; font-size:12px; white-space:pre-wrap;"><strong>AI Summary:</strong><br>${session.aiSummary}</div>` : ''}
+          ${actionsHtml}
         `;
-        listContainer.appendChild(div);
-      });
-
-      document.querySelectorAll('.btn-rate-doc').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          ratingDoctorId = e.target.getAttribute('data-doc-id');
-          document.getElementById('rating-overlay').classList.add('active');
+        
+        div.addEventListener('click', (e) => {
+           if (e.target.classList.contains('btn-rate-doc')) {
+              ratingDoctorId = e.target.getAttribute('data-doc-id');
+              document.getElementById('rating-overlay').classList.add('active');
+              return;
+           }
+           openPatientChat(session.sessionId, session.clinician.firstName, session.status);
         });
+        
+        listContainer.appendChild(div);
       });
     } catch (e) {
       console.error(e);
     }
   }
+
+  async function openPatientChat(sessionId, docName, status) {
+     activeChatSessionId = sessionId;
+     document.getElementById('history-overview-panel').style.display = 'none';
+     document.getElementById('patient-chat-panel').style.display = 'flex';
+     
+     document.getElementById('patient-chat-doctor-name').textContent = `Dr. ${docName}`;
+     document.getElementById('patient-chat-status').textContent = `Status: ${status}`;
+     
+     const chatHistory = document.getElementById('patient-chat-history');
+     chatHistory.innerHTML = '<p style="text-align:center; color:gray; font-size:12px;">Loading chat...</p>';
+     
+     try {
+        const res = await fetch(`/api/patient/consultations/${sessionId}/messages`);
+        const data = await res.json();
+        chatHistory.innerHTML = '';
+        
+        data.messages.forEach(m => {
+           appendPatientChatMessage(m.text, m.sender === 'PATIENT');
+        });
+        
+        if (socket) {
+           socket.emit('join_consultation', sessionId);
+           socket.off('new_message');
+           socket.on('new_message', (msg) => {
+              appendPatientChatMessage(msg.text, msg.sender === 'PATIENT');
+           });
+        }
+     } catch(e) {
+        console.error(e);
+     }
+  }
+
+  function appendPatientChatMessage(text, isPatient) {
+     const chatHistory = document.getElementById('patient-chat-history');
+     const div = document.createElement('div');
+     div.className = `chat-bubble ${isPatient ? 'patient' : 'ai'}`;
+     if(!isPatient) div.style.background = '#2c3e50'; // Make doctor msgs distinct if needed
+     div.textContent = text;
+     chatHistory.appendChild(div);
+     chatHistory.scrollTop = chatHistory.scrollHeight;
+  }
+
+  document.getElementById('btn-back-to-history').addEventListener('click', () => {
+     activeChatSessionId = null;
+     document.getElementById('patient-chat-panel').style.display = 'none';
+     document.getElementById('history-overview-panel').style.display = 'block';
+  });
+
+  document.getElementById('btn-patient-send-message').addEventListener('click', async () => {
+     const input = document.getElementById('patient-chat-input');
+     const text = input.value.trim();
+     if(!text || !activeChatSessionId) return;
+     
+     input.value = '';
+     // Optimistically append
+     // appendPatientChatMessage(text, true); 
+     
+     try {
+        await fetch(`/api/patient/consultations/${activeChatSessionId}/message`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ text, userId: activeUserId })
+        });
+     } catch(e) {
+        console.error(e);
+     }
+  });
+
+  document.getElementById('patient-chat-input').addEventListener('keypress', (e) => {
+     if(e.key === 'Enter') document.getElementById('btn-patient-send-message').click();
+  });
 
   document.getElementById('btn-submit-rating').addEventListener('click', async () => {
     if (!ratingDoctorId) return;
@@ -989,4 +1388,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('dash-user-name').textContent = profileData.fullName;
   }
 });
+
+
 

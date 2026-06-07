@@ -20,21 +20,11 @@
 
     <main class="container">
 
-        <!-- 1. LOGIN / REGISTER SCREEN -->
+        <!-- 1. LOADING SCREEN -->
         <section id="view-login" class="view-panel active">
-            <div class="glass-panel text-center">
-                <h2 style="font-size:22px; margin-bottom:8px;">Welcome, Patient 👋</h2>
-                <p style="font-size:13px; color:var(--color-text-secondary); margin-bottom:24px;">
-                    Register or connect to your local health profile to start scanning, consulting, and tracking.
-                </p>
-
-                <div class="form-group" style="text-align:left;">
-                    <label class="form-label">Telegram User ID</label>
-                    <input type="text" id="login-telegram-id" class="form-input" placeholder="e.g. 999999999"
-                        value="999999999">
-                </div>
-
-                <button class="btn btn-primary" id="btn-login-submit">🚀 Connect Account</button>
+            <div style="text-align:center; padding-top: 40vh; color: var(--color-primary);">
+                <h2>Authenticating securely...</h2>
+                <p style="color:gray; font-size:12px; margin-top:10px;">Connecting to Telegram Network</p>
             </div>
         </section>
 
@@ -236,26 +226,70 @@
                     </div>
 
                     <h3 class="subsection-title">🏥 Medical History</h3>
+                    
                     <div class="form-group">
-                        <label class="form-label">Existing Conditions</label>
-                        <input type="text" id="prof-conditions" class="form-input"
-                            placeholder="Hypertension, Diabetes, etc.">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Allergies</label>
-                        <input type="text" id="prof-allergies" class="form-input" placeholder="Food, medicines, etc.">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Current Medications</label>
-                        <input type="text" id="prof-medications" class="form-input" placeholder="Active prescriptions">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Previous Injuries</label>
-                        <input type="text" id="prof-injuries" class="form-input"
-                            placeholder="Fractures, spine injuries, etc.">
+                        <label class="form-label">Search & Add Medical Conditions</label>
+                        <div class="custom-combobox" id="disease-combobox">
+                            <input type="text" id="disease-search-input" class="form-input" placeholder="Type to search diseases (e.g., Malaria, Asthma)..." autocomplete="off">
+                            <div class="combobox-dropdown" id="disease-dropdown" style="display:none;"></div>
+                        </div>
                     </div>
 
-                    <button type="button" class="btn btn-primary" id="btn-save-profile">💾 Save Profile</button>
+                    <div class="conditions-manager">
+                        <div class="conditions-column">
+                            <h4 style="font-size:14px; margin-bottom:10px; color:var(--color-primary); display:flex; justify-content:space-between;">
+                                <span>Active Conditions</span>
+                                <span style="font-size:11px; color:#9CA3AF;">Is Healed?</span>
+                            </h4>
+                            <div id="active-conditions-list" class="condition-list-container">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <div class="conditions-column" style="margin-top: 15px;">
+                            <h4 style="font-size:14px; margin-bottom:10px; color:var(--color-success);">Healed / Past Conditions</h4>
+                            <div id="healed-conditions-list" class="condition-list-container healed-mode">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr style="border:1px solid rgba(255,255,255,0.05); margin: 24px 0;">
+
+                    <div class="form-group">
+                        <label class="form-label">Allergies</label>
+                        <div class="custom-combobox">
+                            <input type="text" id="allergies-search-input" class="form-input" placeholder="Search allergies (e.g., Penicillin, Peanuts)..." autocomplete="off">
+                            <div class="combobox-dropdown" id="allergies-dropdown" style="display:none;"></div>
+                        </div>
+                        <div class="conditions-manager">
+                            <div id="allergies-list" class="condition-list-container"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Current Medications</label>
+                        <div class="custom-combobox">
+                            <input type="text" id="meds-search-input" class="form-input" placeholder="Search medications (e.g., Paracetamol, Lisinopril)..." autocomplete="off">
+                            <div class="combobox-dropdown" id="meds-dropdown" style="display:none;"></div>
+                        </div>
+                        <div class="conditions-manager">
+                            <div id="meds-list" class="condition-list-container"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Previous Physical Injuries</label>
+                        <div class="custom-combobox">
+                            <input type="text" id="injuries-search-input" class="form-input" placeholder="Search injuries (e.g., Whiplash, Fractured Tibia)..." autocomplete="off">
+                            <div class="combobox-dropdown" id="injuries-dropdown" style="display:none;"></div>
+                        </div>
+                        <div class="conditions-manager">
+                            <div id="injuries-list" class="condition-list-container"></div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" id="btn-save-profile" style="margin-top:20px;">💾 Save Profile</button>
                 </form>
             </div>
         </section>
@@ -409,8 +443,16 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Choose Date & Time</label>
-                    <input type="datetime-local" id="book-datetime" class="form-input">
+                    <label class="form-label">Choose Date & Time (Live Availability)</label>
+                    <input type="hidden" id="book-datetime">
+                    <div id="patient-calendar-container" style="overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid var(--glass-border); padding:10px; margin-top:10px;">
+                        <p style="text-align:center; font-size:12px; color:gray;">Loading live slots...</p>
+                    </div>
+                    <div style="font-size:11px; color:var(--color-text-secondary); text-align:center; margin-top:8px;">
+                        <span style="color:#10B981;">🟩 Available</span> | 
+                        <span style="color:#3B82F6;">🟦 Selected</span> | 
+                        <span style="color:#EF4444;">🟥 Taken/Booked</span>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -419,7 +461,7 @@
                         placeholder="Explain your pain, stiffness, etc."></textarea>
                 </div>
 
-                <button class="btn btn-primary" id="btn-booking-confirm">🔒 Confirm Escrow Booking</button>
+                <button class="btn btn-primary" id="btn-booking-confirm" disabled>🔒 Confirm Escrow Booking</button>
             </div>
         </section>
 
@@ -442,16 +484,36 @@
             </div>
         </section>
 
-        <!-- 10. CONSULTATION HISTORY -->
+        <!-- 10. CONSULTATION HISTORY & CHAT -->
         <section id="view-history" class="view-panel">
-            <div class="glass-panel">
-                <h2 class="panel-title">📖 Consultation History</h2>
+            <div class="glass-panel" id="history-overview-panel">
+                <h2 class="panel-title">💬 My Consultations</h2>
                 <p style="font-size:12px; color:var(--color-text-secondary); margin-bottom:16px;">
-                    Review your previous sessions, AI health summaries, and specialist treatment notes.
+                    Select an active consultation below to chat with your doctor directly.
                 </p>
 
                 <div id="history-list-container" style="display:flex; flex-direction:column; gap:12px;">
                     <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- In-App Patient Chat -->
+            <div class="glass-panel" id="patient-chat-panel" style="display:none; padding:10px; flex-direction: column; height: 60vh;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <button class="btn btn-secondary" id="btn-back-to-history" style="width:auto; padding:6px 10px; font-size:11px;">⬅ Back</button>
+                    <div>
+                        <h3 id="patient-chat-doctor-name" style="margin:0; font-size:16px; color:var(--color-primary);">Dr. Name</h3>
+                        <p id="patient-chat-status" style="margin:0; font-size:11px; color:var(--color-text-secondary);">Active Session</p>
+                    </div>
+                </div>
+                
+                <div id="patient-chat-history" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:5px;">
+                    <!-- Messages go here -->
+                </div>
+                
+                <div style="display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                    <input type="text" id="patient-chat-input" class="form-input" style="flex:1;" placeholder="Message doctor...">
+                    <button class="btn btn-primary" id="btn-patient-send-message" style="width:auto; padding:10px 16px;">➔</button>
                 </div>
             </div>
         </section>
@@ -643,6 +705,10 @@
             <div class="nav-icon">📅</div>
             <span>Visits</span>
         </div>
+        <div class="nav-item" data-view="history" id="nav-history">
+            <div class="nav-icon">💬</div>
+            <span>Chats</span>
+        </div>
         <div class="nav-item" data-view="settings" id="nav-settings">
             <div class="nav-icon">⚙️</div>
             <span>Settings</span>
@@ -656,3 +722,5 @@
 </body>
 
 </html>
+
+

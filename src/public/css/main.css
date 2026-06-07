@@ -28,6 +28,107 @@
   --color-danger-glow: rgba(239, 68, 68, 0.4);
 }
 
+/* ─── CUSTOM COMBOBOX & CONDITIONS LIST ─── */
+.custom-combobox {
+  position: relative;
+  width: 100%;
+}
+.combobox-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  backdrop-filter: blur(15px);
+}
+.combobox-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  color: var(--color-text-primary);
+  transition: background 0.2s;
+}
+.combobox-option:hover {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--color-primary);
+}
+.combobox-add-new {
+  padding: 10px 12px;
+  cursor: pointer;
+  background: rgba(59, 130, 246, 0.1);
+  color: #60A5FA;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+}
+.combobox-add-new:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+.conditions-manager {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 10px;
+}
+.condition-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.condition-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+.condition-item .item-text {
+  flex: 1;
+}
+.condition-item .item-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.condition-item.healed {
+  opacity: 0.6;
+  background: rgba(16, 185, 129, 0.05);
+}
+.condition-item.healed .item-text {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+.healed-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-success);
+}
+.btn-remove-condition {
+  background: transparent;
+  border: none;
+  color: #EF4444;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+.btn-remove-condition:hover {
+  color: #F87171;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
