@@ -7,14 +7,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let dashboardStats = null;
   let currentAppTab = 'active'; // 'active', 'completed', 'cancelled'
   let selectedDoctor = null; // Store doctor selection for booking
+  let defaultTgName = null; // Store Telegram name
 
   // Parse user_id from Telegram URL parameters if available
   const urlParams = new URLSearchParams(window.location.search);
   let tgUserId = urlParams.get('user_id');
+  defaultTgName = urlParams.get('name') || urlParams.get('username') || null;
 
   // Try to use secure Telegram WebApp SDK if available
   if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-    tgUserId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+    const user = window.Telegram.WebApp.initDataUnsafe.user;
+    tgUserId = user.id.toString();
+    defaultTgName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || defaultTgName;
   }
 
   if (tgUserId) {
@@ -33,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dashboard: document.getElementById('view-dashboard'),
     profile: document.getElementById('view-profile'),
     chat: document.getElementById('view-chat'),
+    qa: document.getElementById('view-qa'),
     chatResults: document.getElementById('view-chat-results'),
     specialists: document.getElementById('view-specialists'),
     specialistDetail: document.getElementById('view-specialist-detail'),
@@ -47,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showView(viewName) {
     // Hide all views
     Object.keys(views).forEach(key => {
-      views[key].classList.remove('active');
+      if (views[key]) views[key].classList.remove('active');
     });
 
     // Show selected view
@@ -132,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activeUserId = 'local_backup';
       setupLocalBackupData();
       showView('dashboard');
+      document.querySelector('.tab-navigation').style.display = 'flex';
     } finally {
       if (btnLoginSubmit) {
         btnLoginSubmit.disabled = false;
@@ -140,13 +146,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  btnLoginSubmit.addEventListener('click', () => {
-    connectAccount(document.getElementById('login-telegram-id').value.trim());
-  });
+  if (btnLoginSubmit) {
+    btnLoginSubmit.addEventListener('click', () => {
+      connectAccount(document.getElementById('login-telegram-id').value.trim());
+    });
+  }
 
   // Auto-connect if user ID is found securely via Telegram
   if (tgUserId) {
+    // Hide the login UI completely while auto-connecting
+    document.getElementById('view-login').innerHTML = `
+      <div style="text-align:center; padding-top: 40vh; color: var(--color-primary);">
+        <h2>Authenticating securely...</h2>
+        <p>Connecting to Telegram...</p>
+      </div>
+    `;
     connectAccount(tgUserId);
+  } else {
+    // If absolutely no TG ID is found (e.g. opened in browser), auto-generate a fallback ID and save it so it doesn't change on reload.
+    let fallbackId = localStorage.getItem('webFallbackId');
+    if (!fallbackId) {
+      fallbackId = 'web_' + Math.floor(Math.random() * 1000000000);
+      localStorage.setItem('webFallbackId', fallbackId);
+    }
+    
+    document.getElementById('view-login').innerHTML = `
+      <div style="text-align:center; padding-top: 40vh; color: var(--color-primary);">
+        <h2>Initializing Workspace...</h2>
+      </div>
+    `;
+    connectAccount(fallbackId);
   }
 
   // ─── PROFILE LOGIC ──────────────────────────────────────────────
@@ -170,7 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prof-injuries').value = profileData.previousInjuries || '';
 
     // Prefill settings and dashboard banner
-    document.getElementById('dash-user-name').textContent = profileData.fullName || 'Patient ' + activeUserId.slice(-4);
+    let displayName = profileData.fullName || defaultTgName || 'Guest Patient';
+    document.getElementById('dash-user-name').textContent = displayName;
     document.getElementById('set-anonymous').checked = !!profileData.anonymousMode;
     document.getElementById('set-womens').checked = !!profileData.womensPrivacyMode;
     document.getElementById('set-language').value = profileData.preferredLanguage || 'English';
@@ -224,6 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── DASHBOARD LOGIC ────────────────────────────────────────────
   async function fetchDashboardData() {
     try {
+      fetchReminders(); // Load medication reminders
+      fetchHistory(); // Load history
+
       const res = await fetch(`/api/patient/dashboard/${activeUserId}`);
       dashboardStats = await res.json();
 
@@ -264,6 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('action-consult-ai').addEventListener('click', () => {
     showView('chat');
   });
+  document.getElementById('action-general-qa').addEventListener('click', () => {
+    showView('qa');
+  });
   document.getElementById('action-find-specialist').addEventListener('click', () => {
     fetchSpecialists();
     showView('specialists');
@@ -289,72 +325,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ─── AI CHAT LOGIC ──────────────────────────────────────────────
-  const chatSendBtn = document.getElementById('btn-chat-send');
-  const chatMsgInput = document.getElementById('chat-message-input');
-  const chatContainer = document.getElementById('chat-messages-container');
-
-  chatSendBtn.addEventListener('click', async () => {
-    const symptomsText = chatMsgInput.value.trim();
-    const durationText = document.getElementById('chat-input-duration').value.trim();
-    const severitySelect = document.getElementById('chat-input-severity').value;
-
-    if (!symptomsText) return;
-
-    // Render patient bubble
-    appendChatBubble('patient', symptomsText);
-    chatMsgInput.value = '';
-
-    // Add a temporary typing delay bubble
-    const typingBubble = appendChatBubble('ai', 'Thinking...');
-
-    try {
-      // Call the real live AI Chat endpoint!
-      const aiRes = await fetch('/api/patient/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: symptomsText })
-      });
-      const aiData = await aiRes.json();
-
-      typingBubble.remove();
-
-      let replyText = aiData.replyText || '';
-      if (!replyText) {
-        throw new Error('Empty AI response');
+  // The AI Chat has been securely integrated with Seud's Module
+  document.getElementById('action-consult-ai').addEventListener('click', () => {
+    showView('chat');
+    // Ensure it doesn't initialize twice
+    if (!document.querySelector('#patient-ai-chat-mount .ai-assistant-container')) {
+      if (window.AIAssistantWidget) {
+        new window.AIAssistantWidget('patient-ai-chat-mount');
+        // Add voice placeholder
+        const chatInputArea = document.querySelector('#patient-ai-chat-mount .chat-input-area');
+        if (chatInputArea) {
+          const micBtn = document.createElement('button');
+          micBtn.innerHTML = '🎤';
+          micBtn.className = 'btn';
+          micBtn.style.width = 'auto';
+          micBtn.style.marginRight = '10px';
+          micBtn.onclick = () => alert('🎙 Voice recording initialized (Amharic translation ready) - Placeholder');
+          chatInputArea.insertBefore(micBtn, chatInputArea.firstChild);
+        }
+      } else {
+        document.getElementById('patient-ai-chat-mount').innerHTML = '<p style="padding:20px; text-align:center;">AI Module is offline. Please load app.js correctly.</p>';
       }
-
-      appendChatBubble('ai', replyText);
-
-      // Open Report results after 3 seconds
-      setTimeout(() => {
-        document.getElementById('res-possible-issue').textContent = symptomsText.toLowerCase().includes('neck') ? 'Cervical Spine Strain' : 'Lumbar Joint Compression';
-        document.getElementById('res-risk-level').className = severitySelect === 'Severe' ? 'results-risk-badge badge-red' : 'results-risk-badge badge-amber';
-        document.getElementById('res-risk-level').textContent = `${severitySelect.toUpperCase()} RISK`;
-        document.getElementById('res-recommended-action').textContent = `We recommend scheduling a consultation with a somatic specialist. Avoid lifting heavy objects for 48 hours.`;
-
-        showView('chatResults');
-      }, 3000);
-
-    } catch (err) {
-      // Graceful local backup simulation fallback if LLM is offline or has no keys
-      setTimeout(() => {
-        typingBubble.remove();
-
-        let reply = `Based on your described symptoms: "${symptomsText}" (Duration: ${durationText || 'Unspecified'}, Severity: ${severitySelect}), `;
-        reply += `I suspect a possible posture-related alignment stress. I strongly advise taking passive stretching breaks and extensions. `;
-        reply += `I have prepared a medical report for you. Please tap below to view the results.`;
-
-        appendChatBubble('ai', reply);
-
-        setTimeout(() => {
-          document.getElementById('res-possible-issue').textContent = symptomsText.toLowerCase().includes('neck') ? 'Cervical Spine Strain' : 'Lumbar Joint Compression';
-          document.getElementById('res-risk-level').className = severitySelect === 'Severe' ? 'results-risk-badge badge-red' : 'results-risk-badge badge-amber';
-          document.getElementById('res-risk-level').textContent = `${severitySelect.toUpperCase()} RISK`;
-          document.getElementById('res-recommended-action').textContent = `We recommend scheduling a consultation with a somatic specialist. Avoid lifting heavy objects for 48 hours.`;
-
-          showView('chatResults');
-        }, 3000);
-      }, 1500);
     }
   });
 
@@ -366,28 +357,111 @@ document.addEventListener('DOMContentLoaded', () => {
     showView('specialists');
   });
 
-  function appendChatBubble(sender, text) {
-    const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${sender}`;
-    bubble.textContent = text;
-    chatContainer.appendChild(bubble);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    return bubble;
+  // ─── GENERAL HEALTH Q&A LOGIC ───────────────────────────────────
+  const qaSendBtn = document.getElementById('btn-qa-send');
+  const qaMsgInput = document.getElementById('qa-message-input');
+  const qaContainer = document.getElementById('qa-messages-container');
+  const qaMicBtn = document.getElementById('btn-qa-mic');
+
+  if (qaMicBtn) {
+    qaMicBtn.addEventListener('click', () => {
+      alert('🎙 Voice recording initialized (Amharic translation ready) - Placeholder');
+    });
+  }
+
+  if (qaSendBtn) {
+    qaSendBtn.addEventListener('click', async () => {
+      const questionText = qaMsgInput.value.trim();
+      if (!questionText) return;
+
+      // Render patient bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = `chat-bubble patient`;
+      userBubble.textContent = questionText;
+      qaContainer.appendChild(userBubble);
+      qaContainer.scrollTop = qaContainer.scrollHeight;
+
+      qaMsgInput.value = '';
+
+      // Add typing bubble
+      const typingBubble = document.createElement('div');
+      typingBubble.className = `chat-bubble ai`;
+      typingBubble.textContent = 'Thinking...';
+      qaContainer.appendChild(typingBubble);
+      qaContainer.scrollTop = qaContainer.scrollHeight;
+
+      try {
+        const lang = document.getElementById('set-language').value || 'English';
+        
+        const res = await fetch('/api/ai/qa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: questionText, language: lang })
+        });
+        const data = await res.json();
+
+        typingBubble.remove();
+
+        if (data.success && data.data && data.data.answer) {
+          const aiBubble = document.createElement('div');
+          aiBubble.className = `chat-bubble ai`;
+          aiBubble.textContent = data.data.answer;
+          qaContainer.appendChild(aiBubble);
+        } else {
+          throw new Error('Failed to get answer');
+        }
+      } catch (err) {
+        typingBubble.textContent = "I'm experiencing connectivity issues. Please try again soon.";
+      }
+      qaContainer.scrollTop = qaContainer.scrollHeight;
+    });
+
+    qaMsgInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') qaSendBtn.click();
+    });
   }
 
   // ─── SPECIALISTS & BOOKING LOGIC ─────────────────────────────────
-  async function fetchSpecialists() {
+  const btnSpecialistAiSearch = document.getElementById('btn-specialist-ai-search');
+  const inputSpecialistSearch = document.getElementById('specialist-search-input');
+
+  if (btnSpecialistAiSearch) {
+    btnSpecialistAiSearch.addEventListener('click', () => {
+      const condition = inputSpecialistSearch.value.trim() || 'general';
+      fetchSpecialists(condition);
+    });
+  }
+
+  if (inputSpecialistSearch) {
+    inputSpecialistSearch.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') btnSpecialistAiSearch.click();
+    });
+  }
+
+  async function fetchSpecialists(condition = 'general') {
     const listContainer = document.getElementById('specialists-list-container');
     listContainer.innerHTML = '<p style="font-size:13px; color:var(--color-text-secondary); text-align:center;">Loading vetted specialists...</p>';
 
     try {
-      // Hits the root matching API which returns clinicians list
-      const res = await fetch('/api/clinicians/match', {
+      // Use the advanced AI specialist matching API
+      let endpoint = '/api/ai/specialists';
+      let payload = { condition };
+
+      // If they just opened the tab without searching, just load all via match endpoint
+      if (condition === 'general') {
+        endpoint = '/api/clinicians/match';
+        payload = { symptoms: 'general' };
+      }
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symptoms: 'general' })
+        body: JSON.stringify(payload)
       });
-      const doctors = await res.json();
+      
+      const jsonRes = await res.json();
+      // Handle difference in response formats (AI endpoint wraps in data.data, regular wraps in array or json)
+      const doctors = jsonRes.data || jsonRes;
 
       listContainer.innerHTML = '';
       if (doctors.length === 0) {
@@ -665,8 +739,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-logout').addEventListener('click', () => {
     activeUserId = null;
+    localStorage.removeItem('webFallbackId'); // Clear saved local session
     document.querySelector('.tab-navigation').style.display = 'none';
-    showView('login');
+    window.location.reload(); // Reload to generate a fresh view/session
   });
 
   document.getElementById('btn-become-doctor')?.addEventListener('click', async () => {
@@ -728,6 +803,179 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('patient-overlay').classList.remove('active');
   });
 
+  // ─── MEDICATION REMINDERS LOGIC ─────────────────────────────────
+  async function fetchReminders() {
+    try {
+      const res = await fetch(`/api/patient/reminders/${activeUserId}`);
+      const reminders = await res.json();
+      const listContainer = document.getElementById('reminders-list-container');
+      listContainer.innerHTML = '';
+
+      if (reminders.length === 0) {
+        listContainer.innerHTML = '<p style="font-size:12px; color:var(--color-text-secondary);">No reminders set.</p>';
+        return;
+      }
+
+      reminders.forEach(rem => {
+        const div = document.createElement('div');
+        div.className = 'glass-panel';
+        div.style.padding = '8px';
+        div.style.marginBottom = '5px';
+        div.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:13px; font-weight:bold;">${rem.medName}</div>
+              <div style="font-size:11px; color:var(--color-text-secondary);">${rem.dosage} at ${rem.time}</div>
+            </div>
+            <button class="btn btn-danger btn-delete-reminder" data-id="${rem.id}" style="padding:4px; font-size:10px; width:auto;">X</button>
+          </div>
+        `;
+        listContainer.appendChild(div);
+      });
+
+      document.querySelectorAll('.btn-delete-reminder').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.getAttribute('data-id');
+          await fetch(`/api/patient/reminders/${activeUserId}/${id}`, { method: 'DELETE' });
+          fetchReminders();
+        });
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  document.getElementById('btn-add-reminder').addEventListener('click', async () => {
+    const medName = document.getElementById('rem-name').value;
+    const time = document.getElementById('rem-time').value;
+    if (!medName || !time) return;
+
+    await fetch(`/api/patient/reminders/${activeUserId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ medName, dosage: '1 Dose', time })
+    });
+    
+    document.getElementById('rem-name').value = '';
+    document.getElementById('rem-time').value = '';
+    fetchReminders();
+  });
+
+  // OCR Upload Handlers
+  document.getElementById('btn-upload-prescription').addEventListener('click', () => {
+    document.getElementById('ocr-overlay').classList.add('active');
+  });
+
+  document.getElementById('btn-ocr-cancel').addEventListener('click', () => {
+    document.getElementById('ocr-overlay').classList.remove('active');
+  });
+
+  document.getElementById('btn-ocr-upload').addEventListener('click', async () => {
+    const fileInput = document.getElementById('ocr-file-input');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert("Please select an image file first.");
+      return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64Data = e.target.result.split(',')[1];
+      const mimeType = file.type;
+
+      document.getElementById('btn-ocr-upload').textContent = "Analyzing via Gemini AI...";
+      document.getElementById('btn-ocr-upload').disabled = true;
+
+      try {
+        const res = await fetch('/api/ai/analyze-prescription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64Data, mimeType })
+        });
+        
+        const json = await res.json();
+        
+        if (json.success && json.data.medications) {
+          // Auto-schedule reminders
+          for (let med of json.data.medications) {
+            await fetch(`/api/patient/reminders/${activeUserId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ medName: med.name, dosage: med.dosage, time: "09:00", description: med.purpose })
+            });
+          }
+          document.getElementById('ocr-overlay').classList.remove('active');
+          showAlert('Prescription Analyzed!', 'Your medications have been mapped and reminders set.', '💊');
+          fetchReminders();
+        } else {
+          alert("Failed to parse image.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Server error analyzing image.");
+      } finally {
+        document.getElementById('btn-ocr-upload').textContent = "Analyze Image";
+        document.getElementById('btn-ocr-upload').disabled = false;
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ─── HISTORY & RATING LOGIC ─────────────────────────────────────
+  let ratingDoctorId = null;
+
+  async function fetchHistory() {
+    const listContainer = document.getElementById('history-list-container');
+    try {
+      const res = await fetch(`/api/patient/history/${activeUserId}`);
+      const history = await res.json();
+      listContainer.innerHTML = '';
+
+      if (history.length === 0) {
+        listContainer.innerHTML = '<p style="font-size:13px; color:var(--color-text-secondary); text-align:center;">No completed consultations.</p>';
+        return;
+      }
+
+      history.forEach(session => {
+        const div = document.createElement('div');
+        div.className = 'glass-panel';
+        div.innerHTML = `
+          <div style="font-weight:bold; margin-bottom:5px;">Dr. ${session.clinician.firstName}</div>
+          <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:10px;">${new Date(session.updatedAt).toLocaleDateString()}</div>
+          <div style="font-size:13px; margin-bottom:10px;"><strong>Symptoms:</strong> ${session.patientSymptoms}</div>
+          <div style="padding:10px; background:rgba(0,0,0,0.1); border-left:3px solid #10B981; border-radius:4px; font-size:12px; white-space:pre-wrap;">
+            <strong>AI Doctor Summary:</strong><br>${session.aiSummary || 'No summary available.'}
+          </div>
+          <button class="btn btn-secondary btn-rate-doc" data-doc-id="${session.clinicianId}" style="margin-top:10px; padding:6px; font-size:12px;">Rate Experience</button>
+        `;
+        listContainer.appendChild(div);
+      });
+
+      document.querySelectorAll('.btn-rate-doc').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          ratingDoctorId = e.target.getAttribute('data-doc-id');
+          document.getElementById('rating-overlay').classList.add('active');
+        });
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  document.getElementById('btn-submit-rating').addEventListener('click', async () => {
+    if (!ratingDoctorId) return;
+    const rating = document.getElementById('doc-rating-select').value;
+    
+    await fetch(`/api/patient/rate/${ratingDoctorId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating })
+    });
+
+    document.getElementById('rating-overlay').classList.remove('active');
+    showAlert('Thank you!', 'Your rating has been submitted to the doctor.', '⭐');
+  });
+
   // ─── LOCAL OFFLINE DUMMY BACKUP DATA ────────────────────────────
   function setupLocalBackupData() {
     profileData = {
@@ -741,3 +989,4 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('dash-user-name').textContent = profileData.fullName;
   }
 });
+

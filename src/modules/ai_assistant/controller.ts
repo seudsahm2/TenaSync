@@ -49,4 +49,36 @@ export class AIAssistantController {
       res.status(500).json({ error: 'Failed to find specialists', details: error.message });
     }
   }
+
+  static async askGeneralHealth(req: Request, res: Response): Promise<void> {
+    try {
+      const { question, language } = req.body;
+      if (!question || typeof question !== 'string') {
+        res.status(400).json({ error: 'Question text is required' });
+        return;
+      }
+
+      const answer = await AIAssistantService.askGeneralHealth(question, language);
+      res.json({ success: true, data: { answer } });
+    } catch (error: any) {
+      console.error('Error in askGeneralHealth:', error);
+      res.status(500).json({ error: 'Failed to answer health question', details: error.message });
+    }
+  }
+
+  static async analyzePrescription(req: Request, res: Response): Promise<void> {
+    try {
+      const { imageBase64, mimeType } = req.body;
+      if (!imageBase64 || !mimeType) {
+        res.status(400).json({ error: 'Image data and mimeType are required' });
+        return;
+      }
+
+      const analysis = await AIAssistantService.parsePrescriptionImage(imageBase64, mimeType);
+      res.json({ success: true, data: analysis });
+    } catch (error: any) {
+      console.error('Error in analyzePrescription:', error);
+      res.status(500).json({ error: 'Failed to analyze prescription', details: error.message });
+    }
+  }
 }

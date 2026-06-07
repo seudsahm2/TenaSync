@@ -135,19 +135,21 @@ class AIAssistantWidget {
         } else {
           this.emergencyBanner.classList.add('hidden');
           
-          if (this.chatHistory.length === 2 || this.chatHistory.length % 4 === 0) {
-            this.addMessage("Based on your information so far:");
-            this.addAnalysisResults(data);
-            
-            if (data.condition !== 'Unknown') {
-               setTimeout(() => this.fetchSpecialists(data.condition), 1000);
-            }
-          }
+          // Always provide the home care recommendation
+          this.addMessage(data.recommendation);
           
           if (data.followUpQuestions && data.followUpQuestions.length > 0) {
             setTimeout(() => {
-              const q = data.followUpQuestions[Math.floor(Math.random() * data.followUpQuestions.length)];
+              const q = data.followUpQuestions[0];
               this.addMessage(q);
+            }, 1500);
+          } else {
+            // It has concluded its diagnosis!
+            setTimeout(() => {
+               this.addAnalysisResults(data);
+               if (data.condition !== 'Unknown') {
+                 this.fetchSpecialists(data.condition);
+               }
             }, 1500);
           }
         }

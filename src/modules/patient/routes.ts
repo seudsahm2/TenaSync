@@ -79,6 +79,68 @@ router.post('/appointments/schedule', async (req, res) => {
 });
 
 /**
+ * GET completed consultations history
+ */
+router.get('/history/:id', async (req, res) => {
+  try {
+    const history = await PatientService.getCompletedConsultations(req.params.id);
+    res.json(history);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST rate doctor
+ */
+router.post('/rate/:doctorId', async (req, res) => {
+  try {
+    const { rating } = req.body;
+    if (!rating) return res.status(400).json({ error: 'Missing rating' });
+    const doctor = await PatientService.rateDoctor(req.params.doctorId, parseFloat(rating));
+    res.json({ success: true, doctor });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET medication reminders
+ */
+router.get('/reminders/:id', async (req, res) => {
+  try {
+    const reminders = await PatientService.getReminders(req.params.id);
+    res.json(reminders);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST add medication reminder
+ */
+router.post('/reminders/:id', async (req, res) => {
+  try {
+    const reminder = await PatientService.addReminder(req.params.id, req.body);
+    res.json(reminder);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE medication reminder
+ */
+router.delete('/reminders/:userId/:reminderId', async (req, res) => {
+  try {
+    await PatientService.deleteReminder(req.params.userId, req.params.reminderId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET patient recovery logs
  */
 router.get('/recovery/:id', async (req, res) => {

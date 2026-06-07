@@ -13,7 +13,7 @@ export const bot = new Telegraf(config.BOT_TOKEN);
 
 // Programmatically set global Menu Button on startup
 if (config.TMA_URL) {
-  const globalWebAppUrl = `${config.TMA_URL}/modules/patient/index.html`;
+  const globalWebAppUrl = `${config.TMA_URL}/modules/patient/index.html?v=3`;
   bot.telegram.setChatMenuButton({
     menuButton: {
       type: 'web_app',
@@ -49,7 +49,7 @@ bot.command('start', async (ctx) => {
     `• If you are a *Patient*: Tap the button below to monitor your posture spine index, maternal reproductive recovery logs, and compile indigenous ancestral health remedies.\n\n` +
     `• If you are a *Clinician*: Connect your bot via *Telegram Business > Chatbots* to automate your scheduling and front desk rate negotiations.`;
 
-  const webAppUrl = `${config.TMA_URL}/modules/patient/index.html?user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
+  const webAppUrl = `${config.TMA_URL}/modules/patient/index.html?v=3&user_id=${userId}&username=${username}&name=${encodeURIComponent(firstName)}`;
 
   await ctx.reply(welcomeMessage, {
     parse_mode: 'Markdown',

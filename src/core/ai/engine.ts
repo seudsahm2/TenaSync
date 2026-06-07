@@ -29,7 +29,7 @@ export async function callLLM(prompt: string): Promise<string> {
       const chat = await groqClient.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 300,
+        max_tokens: 500,
         temperature: 0.3, // Low temperature for high precision/RAG truthfulness
       });
       const text = chat.choices[0]?.message?.content?.trim() ?? '';
@@ -45,6 +45,28 @@ export async function callLLM(prompt: string): Promise<string> {
   }
 
   throw new Error('No LLM provider available.');
+}
+
+// ── Multimodal LLM caller (Gemini Only) ──────────────────────────────────────
+export async function callLLMMultimodal(prompt: string, mimeType: string, base64Data: string): Promise<string> {
+  if (geminiModel) {
+    const imageParts = [
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        }
+      }
+    ];
+    try {
+      const result = await geminiModel.generateContent([prompt, ...imageParts]);
+      return result.response.text().trim();
+    } catch (err: any) {
+      console.error('[LLM] Gemini multimodal failed:', err.message);
+      throw err;
+    }
+  }
+  throw new Error('Gemini model is required for image analysis.');
 }
 
 export interface ConsultationResult {

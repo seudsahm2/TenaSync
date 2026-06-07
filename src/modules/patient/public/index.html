@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ጤና-Sync (TenaSync) Patient Portal</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -54,6 +55,11 @@
                     <div class="action-title">Consult AI</div>
                     <div class="action-desc">Symptom checker</div>
                 </button>
+                <button class="action-card" id="action-general-qa">
+                    <div class="action-icon">🌿</div>
+                    <div class="action-title">Health Q&A</div>
+                    <div class="action-desc">Ask about anything</div>
+                </button>
                 <button class="action-card" id="action-find-specialist">
                     <div class="action-icon">👩‍⚕️</div>
                     <div class="action-title">Find Doctor</div>
@@ -98,6 +104,23 @@
                         <div class="action-desc">Map conditions to local superfood remedies</div>
                     </div>
                 </button>
+            </div>
+
+            <!-- Medication Reminders -->
+            <h3 class="section-title">💊 Medication Reminders</h3>
+            <div class="glass-panel">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <h4 style="font-size:14px; margin:0;">Active Prescriptions</h4>
+                    <button class="btn btn-secondary" id="btn-upload-prescription" style="padding:4px 8px; font-size:11px;">📷 AI Parse Prescription</button>
+                </div>
+                <div id="reminders-list-container" style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">
+                    <p style="font-size:12px; color:var(--color-text-secondary);">No reminders set.</p>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="rem-name" class="form-input" placeholder="Name" style="flex:1;">
+                    <input type="time" id="rem-time" class="form-input" style="width:100px;">
+                    <button class="btn btn-primary" id="btn-add-reminder" style="width:auto;">Add</button>
+                </div>
             </div>
 
             <!-- Overview Cards -->
@@ -237,48 +260,31 @@
             </div>
         </section>
 
-        <!-- 4. AI CONSULTATION CHAT -->
+        <!-- 4. AI CONSULTATION CHAT (Integrates Seud's Module) -->
         <section id="view-chat" class="view-panel">
+            <div id="patient-ai-chat-mount">
+                <!-- Seud's AIAssistantWidget will mount here -->
+            </div>
+        </section>
+
+        <!-- 4b. GENERAL HEALTH Q&A -->
+        <section id="view-qa" class="view-panel">
             <div class="glass-panel"
                 style="padding:16px; display:flex; flex-direction:column; height:calc(100vh - 180px); margin-bottom:0;">
-                <div
-                    style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
-                    <h2 style="font-size:16px; margin:0;">🤖 TenaSync AI Assistant</h2>
-                    <span class="badge-green" style="padding:2px 8px; border-radius:12px; font-size:10px;">Active</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                    <h2 style="font-size:16px; margin:0;">🌿 General Health Q&A</h2>
                 </div>
 
-                <!-- Chat messages thread -->
-                <div id="chat-messages-container"
-                    style="flex:1; overflow-y:auto; margin:16px 0; display:flex; flex-direction:column; gap:12px; padding-right:4px;">
+                <div id="qa-messages-container" style="flex:1; overflow-y:auto; margin:16px 0; display:flex; flex-direction:column; gap:12px; padding-right:4px;">
                     <div class="chat-bubble ai">
-                        Hello! I am your TenaSync AI health assistant. Please describe your pain or somatic symptoms,
-                        and I will analyze them and suggest a recovery path or clinician.
+                        Ask me any general medical question, or about Ethiopian traditional remedies (like Teff, Beso, Moringa, Telba). I can respond in English or Amharic.
                     </div>
                 </div>
 
-                <!-- Symptoms initial input box (if starting fresh) -->
-                <div id="chat-onboarding-inputs" style="margin-bottom:12px;">
-                    <div class="form-group" style="margin-bottom:12px;">
-                        <label class="form-label">How long have you felt this? (Duration)</label>
-                        <input type="text" id="chat-input-duration" class="form-input"
-                            placeholder="e.g. 3 days, 2 weeks">
-                    </div>
-                    <div class="form-group" style="margin-bottom:12px;">
-                        <label class="form-label">Pain Severity</label>
-                        <select id="chat-input-severity" class="form-input select-input">
-                            <option value="Mild">Mild</option>
-                            <option value="Moderate">Moderate</option>
-                            <option value="Severe">Severe</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Input Row -->
                 <div style="display:flex; gap:8px;">
-                    <input type="text" id="chat-message-input" class="form-input" style="flex:1;"
-                        placeholder="Describe symptoms (e.g. neck pain)">
-                    <button class="btn btn-primary" id="btn-chat-send" style="width:auto; padding:12px 16px;"><span
-                            style="font-size:16px;">➔</span></button>
+                    <button class="btn" id="btn-qa-mic" style="width:auto; padding:12px; background:rgba(255,255,255,0.1);">🎤</button>
+                    <input type="text" id="qa-message-input" class="form-input" style="flex:1;" placeholder="Ask a health question...">
+                    <button class="btn btn-primary" id="btn-qa-send" style="width:auto; padding:12px 16px;"><span style="font-size:16px;">➔</span></button>
                 </div>
             </div>
         </section>
@@ -319,12 +325,17 @@
         <!-- 6. SPECIALIST LIST -->
         <section id="view-specialists" class="view-panel">
             <div class="glass-panel">
-                <h2 class="panel-title">👩‍⚕️ Somatic Specialists</h2>
+                <h2 class="panel-title">👩‍⚕️ Find a Specialist</h2>
                 <p style="font-size:12px; color:var(--color-text-secondary); margin-bottom:16px;">
-                    Vetted clinicians available inside Addis Ababa, Hawassa, and Adama.
+                    Search for vetted clinicians in your area. You can describe your symptoms in natural language, and our AI will find the exact specialist you need.
                 </p>
 
-                <div id="specialists-list-container" class="doctor-list">
+                <div style="display:flex; gap:8px; margin-bottom:20px;">
+                    <input type="text" id="specialist-search-input" class="form-input" style="flex:1;" placeholder="E.g. I have severe stomach pain...">
+                    <button class="btn btn-primary" id="btn-specialist-ai-search" style="width:auto; padding:12px 16px;">🔍 Search</button>
+                </div>
+
+                <div id="specialists-list-container" class="doctor-list" style="display:flex; flex-direction:column; gap:12px;">
                     <!-- Populated dynamically -->
                 </div>
             </div>
@@ -566,6 +577,41 @@
 
     </main>
 
+    <!-- Overlay Rating -->
+    <div class="overlay" id="rating-overlay">
+        <div class="overlay-content">
+            <h3 style="margin-bottom:8px; font-size:20px;">Rate Your Doctor</h3>
+            <p style="font-size:13px; color:var(--color-text-secondary); margin-bottom:20px;">
+                Your consultation has been marked as completed. Please rate your experience.
+            </p>
+            <div class="form-group">
+                <select id="doc-rating-select" class="form-input select-input" style="font-size: 24px; text-align:center;">
+                    <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                    <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                    <option value="3">⭐⭐⭐ (3/5)</option>
+                    <option value="2">⭐⭐ (2/5)</option>
+                    <option value="1">⭐ (1/5)</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="btn-submit-rating">Submit Rating</button>
+        </div>
+    </div>
+
+    <!-- OCR Upload Overlay -->
+    <div class="overlay" id="ocr-overlay">
+        <div class="overlay-content">
+            <h3 style="margin-bottom:8px; font-size:18px;">Upload Prescription</h3>
+            <p style="font-size:12px; color:var(--color-text-secondary); margin-bottom:15px;">
+                Upload a photo of your medical paper or pill bottle. Our Gemini Multimodal AI will extract the medications and schedule your reminders.
+            </p>
+            <input type="file" id="ocr-file-input" accept="image/*" class="form-input" style="margin-bottom:15px;">
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-secondary" id="btn-ocr-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-ocr-upload">Analyze Image</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Overlay Confirmations -->
     <div class="overlay" id="patient-overlay">
         <div class="overlay-content">
@@ -603,7 +649,10 @@
         </div>
     </nav>
 
-    <script src="app.js"></script>
+    <!-- AI Assistant Module Integration -->
+    <link rel="stylesheet" href="/modules/ai_assistant/style.css">
+    <script src="/modules/ai_assistant/app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 
 </html>

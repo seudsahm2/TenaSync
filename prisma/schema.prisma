@@ -35,6 +35,8 @@ model User {
   // Clinician Specialty & Treatment Options
   specialty            String?                           // e.g., "Spine & Posture", "Postpartum Care", "Nutrition"
   treatmentOptions     String[]            @default([])  // e.g., ["In-Home", "Hospital", "Telehealth"]
+  rating               Float               @default(5.0)
+  reviewCount          Int                 @default(0)
   
   // Somatic Biometric State Metrics
   postureStrainIndex   Float               @default(0.0) // Calculated via sedentary stress factors
@@ -50,6 +52,7 @@ model User {
   // Patient Profile & Recovery Relations
   patientProfile       PatientProfile?
   recoveryLogs         RecoveryLog[]
+  medicationReminders  MedicationReminder[]
   
   // Specialized Domain
   specializedProfile   SpecializedProfile?
@@ -103,6 +106,18 @@ model RecoveryLog {
   notes              String?
   
   createdAt          DateTime @default(now())
+}
+
+model MedicationReminder {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medName     String
+  dosage      String
+  time        String
+  isTaken     Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now())
 }
 
 model ClinicianDocument {
