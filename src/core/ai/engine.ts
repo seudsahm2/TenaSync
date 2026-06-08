@@ -86,22 +86,22 @@ export async function processClinicianConsultationTurn(
   const consultation = await prisma.consultationSession.findUnique({
     where: { id: consultationId },
     include: {
-      // @ts-ignore
-      patient: {
-        include: {
-          patientProfile: true,
-          recoveryLogs: {
-            orderBy: { createdAt: 'desc' },
-            take: 3
-          }
-        }
-      },
+      patient: true,
       clinician: {
         include: { documents: true }
       },
       messages: { orderBy: { createdAt: 'asc' } },
     },
   });
+
+  let pProfile = null;
+  let pLogs = [];
+  if (consultation?.patient?.id) {
+    // @ts-ignore
+    pProfile = await prisma.patientProfile.findUnique({ where: { userId: consultation.patient.id } });
+    // @ts-ignore
+    pLogs = await prisma.recoveryLog.findMany({ where: { userId: consultation.patient.id }, orderBy: { createdAt: 'desc' }, take: 3 });
+  }
 
   if (!consultation) throw new Error(`Consultation session ${consultationId} not found`);
 
@@ -111,16 +111,10 @@ export async function processClinicianConsultationTurn(
 
   // 1. Compile clinician document guidelines
   const guidelinesContext = docs.length > 0
-    // @ts-ignore
-    ? docs.map((d, index) => `--- Document ${index + 1}: ${d.title} ---\n${d.content}`).join('\n\n')
+    ? docs.map((d: any, index: number) => `--- Document ${index + 1}: ${d.title} ---\n${d.content}`).join('\n\n')
     : "No reference guideline documents uploaded yet by this clinician.";
 
   // 2. Compile Patient Metrics Context
-  // @ts-ignore
-  const pProfile = consultation.patient.patientProfile;
-  // @ts-ignore
-  const pLogs = consultation.patient.recoveryLogs || [];
-  
   let patientContext = `Age: ${pProfile?.age || 'Unknown'}\n`;
   patientContext += `Gender: ${pProfile?.gender || 'Unknown'}\n`;
   patientContext += `Existing Conditions: ${pProfile?.existingConditions || 'None reported'}\n`;

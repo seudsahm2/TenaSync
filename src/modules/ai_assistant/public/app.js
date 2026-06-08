@@ -16,27 +16,27 @@ class AIAssistantWidget {
 
   initUI() {
     this.container.innerHTML = `
-      <div class="ai-assistant-container">
-        <div id="emergency-banner-${this.container.id}" class="emergency-banner hidden">
+      <div class="glass-panel" style="display:flex; flex-direction:column; height:calc(100vh - 180px); padding:16px; margin-bottom:0;">
+        <div id="emergency-banner-${this.container.id}" class="emergency-banner hidden" style="border-radius:8px; margin-bottom:10px;">
           🚨 POTENTIAL MEDICAL EMERGENCY DETECTED. PLEASE SEEK IMMEDIATE HELP.
         </div>
         
-        <div class="chat-interface">
-          <div class="chat-header">
-            <h3>AI Health Assistant</h3>
-            <p>Describe your symptoms to get started</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+          <div>
+            <h2 style="font-size:16px; margin:0; color:var(--color-primary);">AI Health Assistant</h2>
+            <p style="margin:0; font-size:11px; color:var(--color-text-secondary);">Describe your symptoms to get started</p>
           </div>
-          
-          <div id="chat-messages-${this.container.id}" class="chat-messages">
-            <div class="message ai-message">
-              Hello! I am your TenaSync AI Assistant. What symptoms are you experiencing today?
-            </div>
+        </div>
+        
+        <div id="chat-messages-${this.container.id}" style="flex:1; overflow-y:auto; margin:16px 0; display:flex; flex-direction:column; gap:12px; padding-right:4px;">
+          <div class="chat-bubble ai">
+            Hello! I am your TenaSync AI Assistant. What symptoms are you experiencing today?
           </div>
-          
-          <div class="chat-input-area">
-            <input type="text" id="symptom-input-${this.container.id}" placeholder="E.g., I have a headache and mild fever..." />
-            <button id="send-btn-${this.container.id}">Send</button>
-          </div>
+        </div>
+        
+        <div style="display:flex; gap:8px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+          <input type="text" id="symptom-input-${this.container.id}" class="form-input" style="flex:1;" placeholder="E.g., I have a headache and mild fever..." />
+          <button class="btn btn-primary" id="send-btn-${this.container.id}" style="width:auto; padding:10px 16px;">➔</button>
         </div>
       </div>
     `;
@@ -54,8 +54,8 @@ class AIAssistantWidget {
 
   addMessage(text, isUser = false) {
     const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message');
-    msgDiv.classList.add(isUser ? 'user-message' : 'ai-message');
+    msgDiv.classList.add('chat-bubble');
+    msgDiv.classList.add(isUser ? 'patient' : 'ai');
     msgDiv.textContent = text;
     this.chatMessages.appendChild(msgDiv);
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
@@ -117,7 +117,7 @@ class AIAssistantWidget {
     const userId = tgUserId || localStorage.getItem('webFallbackId') || '';
 
     const typingMsg = document.createElement('div');
-    typingMsg.classList.add('message', 'ai-message');
+    typingMsg.classList.add('chat-bubble', 'ai');
     typingMsg.textContent = 'Thinking...';
     this.chatMessages.appendChild(typingMsg);
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
@@ -182,3 +182,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new AIAssistantWidget('ai-assistant-mount');
   }
 });
+

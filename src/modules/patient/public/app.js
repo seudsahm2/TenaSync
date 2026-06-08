@@ -134,6 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
       await fetchDashboardData();
       // Go to Dashboard
       showView('dashboard');
+      
+      // Init 3D Visualizer
+      setTimeout(() => { if (typeof init3DBody === 'function') init3DBody(); }, 300);
+
       // Show bottom navigation
       document.querySelector('.tab-navigation').style.display = 'flex';
     } catch (err) {
@@ -191,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       dropdown.style.display = 'block';
       let matches = dataList.filter(d => d.toLowerCase().includes(val));
-      
+
       matches.forEach(m => {
         const div = document.createElement('div');
         div.className = 'combobox-option';
@@ -322,15 +326,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prof-occupation').value = profileData.occupation || '';
     document.getElementById('prof-activity').value = profileData.activityLevel || '';
     document.getElementById('prof-workStyle').value = profileData.workStyle || '';
-    
+
     // Parse combined conditions logic
     const conds = profileData.existingConditions || '';
     const activeMatch = conds.match(/Active: (.*?)(?: \| Healed:|$)/);
     const healedMatch = conds.match(/Healed: (.*)$/);
-    
+
     let aStr = activeMatch ? activeMatch[1].trim() : conds.replace(/Healed:.*/, '').trim();
     let hStr = healedMatch ? healedMatch[1].trim() : '';
-    
+
     activeConditionsArr.length = 0;
     if (aStr) activeConditionsArr.push(...aStr.split(',').map(s => s.trim()).filter(Boolean));
     healedConditionsArr.length = 0;
@@ -343,10 +347,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (profileData.currentMedications) medsArr.push(...profileData.currentMedications.split(',').map(s => s.trim()).filter(Boolean));
     injuriesArr.length = 0;
     if (profileData.previousInjuries) injuriesArr.push(...profileData.previousInjuries.split(',').map(s => s.trim()).filter(Boolean));
-    
+
     renderAllergies();
     renderMeds();
     renderInjuries();
+
+    // Trigger 3D Body visualizer mapping
+    setTimeout(() => {
+      if (typeof mapConditionsTo3D === 'function') mapConditionsTo3D(profileData);
+    }, 500);
 
     // Prefill settings and dashboard banner
     let displayName = profileData.fullName || defaultTgName || 'Guest Patient';
@@ -365,11 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnSaveProfile = document.getElementById('btn-save-profile');
   btnSaveProfile.addEventListener('click', async () => {
-    
+
     // Build brilliant conditions format for AI Awareness
     let combinedC = '';
     if (activeConditionsArr.length > 0 || healedConditionsArr.length > 0) {
-       combinedC = `Active: ${activeConditionsArr.join(', ')} | Healed: ${healedConditionsArr.join(', ')}`;
+      combinedC = `Active: ${activeConditionsArr.join(', ')} | Healed: ${healedConditionsArr.join(', ')}`;
     }
 
     const formData = {
@@ -549,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const lang = document.getElementById('set-language').value || 'English';
-        
+
         const res = await fetch('/api/ai/qa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -628,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     // Calculate dynamic rows based on active slots
-    if(activeDoctorCalendar.length === 0) {
+    if (activeDoctorCalendar.length === 0) {
       container.innerHTML = '<p style="text-align:center; font-size:12px; color:gray;">Doctor has not set availability yet.</p>';
       return;
     }
@@ -642,10 +651,10 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let row = 0; row < totalRows; row++) {
       const currentMins = (startHour * 60) + (row * intervalMins);
       const nextMins = currentMins + intervalMins;
-      
+
       const hr1 = Math.floor(currentMins / 60).toString().padStart(2, '0');
       const m1 = (currentMins % 60).toString().padStart(2, '0');
-      
+
       const timeLabel = `${hr1}:${m1}`;
 
       const timeDiv = document.createElement('div');
@@ -660,57 +669,57 @@ document.addEventListener('DOMContentLoaded', () => {
       // Generate next 7 days starting from next Monday, or just generic days
       for (let day = 1; day <= 7; day++) {
         const backendDay = day === 7 ? 0 : day;
-        
+
         const cell = document.createElement('div');
         cell.style.borderRadius = '4px';
         cell.style.height = '24px';
         cell.style.transition = 'all 0.2s';
-        
+
         // Is slot available?
         const isAvailable = activeDoctorCalendar.some(s => s.dayOfWeek === backendDay && s.startTime === timeLabel);
-        
+
         // Calculate date for this specific cell (dummy logic for next 7 days based on current day)
         // Here we just use a generic format to check booking
         const isBooked = activeBookedSlots.some(b => {
-           const bDate = new Date(b.scheduledTime);
-           return bDate.getDay() === backendDay && `${bDate.getHours().toString().padStart(2,'0')}:${bDate.getMinutes().toString().padStart(2,'0')}` === timeLabel;
+          const bDate = new Date(b.scheduledTime);
+          return bDate.getDay() === backendDay && `${bDate.getHours().toString().padStart(2, '0')}:${bDate.getMinutes().toString().padStart(2, '0')}` === timeLabel;
         });
 
         if (isBooked) {
-           cell.style.background = 'rgba(239, 68, 68, 0.4)';
-           cell.style.border = '1px solid var(--color-danger)';
-           cell.style.cursor = 'not-allowed';
-           cell.title = 'Taken';
+          cell.style.background = 'rgba(239, 68, 68, 0.4)';
+          cell.style.border = '1px solid var(--color-danger)';
+          cell.style.cursor = 'not-allowed';
+          cell.title = 'Taken';
         } else if (isAvailable) {
-           cell.style.background = 'rgba(16, 185, 129, 0.4)';
-           cell.style.border = '1px solid var(--color-success)';
-           cell.style.cursor = 'pointer';
-           cell.title = 'Available';
-           
-           // If it's currently selected
-           if (selectedSlot && selectedSlot.day === backendDay && selectedSlot.time === timeLabel) {
-               cell.style.background = 'rgba(59, 130, 246, 0.6)';
-               cell.style.border = '2px solid var(--color-accent)';
-           }
+          cell.style.background = 'rgba(16, 185, 129, 0.4)';
+          cell.style.border = '1px solid var(--color-success)';
+          cell.style.cursor = 'pointer';
+          cell.title = 'Available';
 
-           cell.addEventListener('click', () => {
-             selectedSlot = { day: backendDay, time: timeLabel };
-             // Mock standard JS Date generation for the selected slot (Next upcoming 'dayOfWeek')
-             const d = new Date();
-             d.setDate(d.getDate() + ((backendDay + 7 - d.getDay()) % 7 || 7));
-             d.setHours(parseInt(hr1), parseInt(m1), 0, 0);
-             
-             // Convert to local datetime-local format
-             const offset = d.getTimezoneOffset() * 60000;
-             const localISOTime = (new Date(d - offset)).toISOString().slice(0, 16);
-             document.getElementById('book-datetime').value = localISOTime;
-             
-             document.getElementById('btn-booking-confirm').disabled = false;
-             renderPatientCalendar(doctorId);
-           });
+          // If it's currently selected
+          if (selectedSlot && selectedSlot.day === backendDay && selectedSlot.time === timeLabel) {
+            cell.style.background = 'rgba(59, 130, 246, 0.6)';
+            cell.style.border = '2px solid var(--color-accent)';
+          }
+
+          cell.addEventListener('click', () => {
+            selectedSlot = { day: backendDay, time: timeLabel };
+            // Mock standard JS Date generation for the selected slot (Next upcoming 'dayOfWeek')
+            const d = new Date();
+            d.setDate(d.getDate() + ((backendDay + 7 - d.getDay()) % 7 || 7));
+            d.setHours(parseInt(hr1), parseInt(m1), 0, 0);
+
+            // Convert to local datetime-local format
+            const offset = d.getTimezoneOffset() * 60000;
+            const localISOTime = (new Date(d - offset)).toISOString().slice(0, 16);
+            document.getElementById('book-datetime').value = localISOTime;
+
+            document.getElementById('btn-booking-confirm').disabled = false;
+            renderPatientCalendar(doctorId);
+          });
         } else {
-           cell.style.background = 'rgba(255,255,255,0.03)';
-           cell.style.border = '1px solid rgba(255,255,255,0.05)';
+          cell.style.background = 'rgba(255,255,255,0.03)';
+          cell.style.border = '1px solid rgba(255,255,255,0.05)';
         }
 
         grid.appendChild(cell);
@@ -725,28 +734,28 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-booking-confirm').disabled = true;
 
     try {
-       const res = await fetch(`/api/doctor/availability/${doctorId}`);
-       activeDoctorCalendar = await res.json();
-       
-       // Get booked consultations to find taken slots
-       const cRes = await fetch(`/api/doctor/patients/${activeUserId}/history`); // Wait, we need all consults for this doctor to know which are taken.
-       // Actually, we can fetch all consultations for this doctor via a new endpoint or pass it in availability.
-       // Since the endpoint doesn't exist, we will assume patients can only see their own taken slots unless we build a public schedule route.
-       // For hackathon, we will render it natively without the booked slots cross-check if the route is missing.
-       activeBookedSlots = []; 
-       
-       renderPatientCalendar(doctorId);
+      const res = await fetch(`/api/doctor/availability/${doctorId}`);
+      activeDoctorCalendar = await res.json();
 
-       // Setup socket listener
-       if (socket) {
-          socket.emit('watch_doctor_slots', doctorId);
-          socket.off('calendar_updated');
-          socket.on('calendar_updated', (docId) => {
-             if(docId === doctorId) loadDoctorCalendar(doctorId); // Auto-refresh live!
-          });
-       }
-    } catch(e) {
-       console.error(e);
+      // Get booked consultations to find taken slots
+      const cRes = await fetch(`/api/doctor/patients/${activeUserId}/history`); // Wait, we need all consults for this doctor to know which are taken.
+      // Actually, we can fetch all consultations for this doctor via a new endpoint or pass it in availability.
+      // Since the endpoint doesn't exist, we will assume patients can only see their own taken slots unless we build a public schedule route.
+      // For hackathon, we will render it natively without the booked slots cross-check if the route is missing.
+      activeBookedSlots = [];
+
+      renderPatientCalendar(doctorId);
+
+      // Setup socket listener
+      if (socket) {
+        socket.emit('watch_doctor_slots', doctorId);
+        socket.off('calendar_updated');
+        socket.on('calendar_updated', (docId) => {
+          if (docId === doctorId) loadDoctorCalendar(doctorId); // Auto-refresh live!
+        });
+      }
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -770,7 +779,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
       const jsonRes = await res.json();
       // Handle difference in response formats (AI endpoint wraps in data.data, regular wraps in array or json)
       const doctors = jsonRes.data || jsonRes;
@@ -831,7 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = opt;
       typeSelect.appendChild(el);
     });
-    
+
     // Trigger socket calendar load
     loadDoctorCalendar(selectedDoctor.id);
 
@@ -1061,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-become-doctor')?.addEventListener('click', async () => {
     if (!activeUserId) return;
-    
+
     // Call the doctor verification endpoint to upgrade role
     try {
       const res = await fetch(`/api/doctor/verify/${profileData.id}`, {
@@ -1170,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ medName, dosage: '1 Dose', time })
     });
-    
+
     document.getElementById('rem-name').value = '';
     document.getElementById('rem-time').value = '';
     fetchReminders();
@@ -1207,9 +1216,9 @@ document.addEventListener('DOMContentLoaded', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageBase64: base64Data, mimeType })
         });
-        
+
         const json = await res.json();
-        
+
         if (json.success && json.data.medications) {
           // Auto-schedule reminders
           for (let med of json.data.medications) {
@@ -1257,12 +1266,12 @@ document.addEventListener('DOMContentLoaded', () => {
         div.className = 'glass-panel';
         div.style.cursor = 'pointer';
         div.style.border = '1px solid rgba(255,255,255,0.05)';
-        
+
         let actionsHtml = '';
         if (session.status === 'COMPLETED') {
-           actionsHtml = `<button class="btn btn-secondary btn-rate-doc" data-doc-id="${session.clinicianId}" style="margin-top:10px; padding:6px; font-size:12px;">Rate Experience</button>`;
+          actionsHtml = `<button class="btn btn-secondary btn-rate-doc" data-doc-id="${session.clinicianId}" style="margin-top:10px; padding:6px; font-size:12px;">Rate Experience</button>`;
         } else {
-           actionsHtml = `<button class="btn btn-primary btn-chat-doc" style="margin-top:10px; padding:6px; font-size:12px; background:#3b82f6;">Open Chat</button>`;
+          actionsHtml = `<button class="btn btn-primary btn-chat-doc" style="margin-top:10px; padding:6px; font-size:12px; background:#3b82f6;">Open Chat</button>`;
         }
 
         div.innerHTML = `
@@ -1272,16 +1281,16 @@ document.addEventListener('DOMContentLoaded', () => {
           ${session.aiSummary ? `<div style="padding:10px; background:rgba(0,0,0,0.1); border-left:3px solid #10B981; border-radius:4px; font-size:12px; white-space:pre-wrap;"><strong>AI Summary:</strong><br>${session.aiSummary}</div>` : ''}
           ${actionsHtml}
         `;
-        
+
         div.addEventListener('click', (e) => {
-           if (e.target.classList.contains('btn-rate-doc')) {
-              ratingDoctorId = e.target.getAttribute('data-doc-id');
-              document.getElementById('rating-overlay').classList.add('active');
-              return;
-           }
-           openPatientChat(session.sessionId, session.clinician.firstName, session.status);
+          if (e.target.classList.contains('btn-rate-doc')) {
+            ratingDoctorId = e.target.getAttribute('data-doc-id');
+            document.getElementById('rating-overlay').classList.add('active');
+            return;
+          }
+          openPatientChat(session.sessionId, session.clinician.firstName, session.status);
         });
-        
+
         listContainer.appendChild(div);
       });
     } catch (e) {
@@ -1290,81 +1299,81 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function openPatientChat(sessionId, docName, status) {
-     activeChatSessionId = sessionId;
-     document.getElementById('history-overview-panel').style.display = 'none';
-     document.getElementById('patient-chat-panel').style.display = 'flex';
-     
-     document.getElementById('patient-chat-doctor-name').textContent = `Dr. ${docName}`;
-     document.getElementById('patient-chat-status').textContent = `Status: ${status}`;
-     
-     const chatHistory = document.getElementById('patient-chat-history');
-     chatHistory.innerHTML = '<p style="text-align:center; color:gray; font-size:12px;">Loading chat...</p>';
-     
-     try {
-        const res = await fetch(`/api/patient/consultations/${sessionId}/messages`);
-        const data = await res.json();
-        chatHistory.innerHTML = '';
-        
-        data.messages.forEach(m => {
-           appendPatientChatMessage(m.text, m.sender === 'PATIENT');
+    activeChatSessionId = sessionId;
+    document.getElementById('history-overview-panel').style.display = 'none';
+    document.getElementById('patient-chat-panel').style.display = 'flex';
+
+    document.getElementById('patient-chat-doctor-name').textContent = `Dr. ${docName}`;
+    document.getElementById('patient-chat-status').textContent = `Status: ${status}`;
+
+    const chatHistory = document.getElementById('patient-chat-history');
+    chatHistory.innerHTML = '<p style="text-align:center; color:gray; font-size:12px;">Loading chat...</p>';
+
+    try {
+      const res = await fetch(`/api/patient/consultations/${sessionId}/messages`);
+      const data = await res.json();
+      chatHistory.innerHTML = '';
+
+      data.messages.forEach(m => {
+        appendPatientChatMessage(m.text, m.sender === 'PATIENT');
+      });
+
+      if (socket) {
+        socket.emit('join_consultation', sessionId);
+        socket.off('new_message');
+        socket.on('new_message', (msg) => {
+          appendPatientChatMessage(msg.text, msg.sender === 'PATIENT');
         });
-        
-        if (socket) {
-           socket.emit('join_consultation', sessionId);
-           socket.off('new_message');
-           socket.on('new_message', (msg) => {
-              appendPatientChatMessage(msg.text, msg.sender === 'PATIENT');
-           });
-        }
-     } catch(e) {
-        console.error(e);
-     }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   function appendPatientChatMessage(text, isPatient) {
-     const chatHistory = document.getElementById('patient-chat-history');
-     const div = document.createElement('div');
-     div.className = `chat-bubble ${isPatient ? 'patient' : 'ai'}`;
-     if(!isPatient) div.style.background = '#2c3e50'; // Make doctor msgs distinct if needed
-     div.textContent = text;
-     chatHistory.appendChild(div);
-     chatHistory.scrollTop = chatHistory.scrollHeight;
+    const chatHistory = document.getElementById('patient-chat-history');
+    const div = document.createElement('div');
+    div.className = `chat-bubble ${isPatient ? 'patient' : 'ai'}`;
+    if (!isPatient) div.style.background = '#2c3e50'; // Make doctor msgs distinct if needed
+    div.textContent = text;
+    chatHistory.appendChild(div);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
   }
 
   document.getElementById('btn-back-to-history').addEventListener('click', () => {
-     activeChatSessionId = null;
-     document.getElementById('patient-chat-panel').style.display = 'none';
-     document.getElementById('history-overview-panel').style.display = 'block';
+    activeChatSessionId = null;
+    document.getElementById('patient-chat-panel').style.display = 'none';
+    document.getElementById('history-overview-panel').style.display = 'block';
   });
 
   document.getElementById('btn-patient-send-message').addEventListener('click', async () => {
-     const input = document.getElementById('patient-chat-input');
-     const text = input.value.trim();
-     if(!text || !activeChatSessionId) return;
-     
-     input.value = '';
-     // Optimistically append
-     // appendPatientChatMessage(text, true); 
-     
-     try {
-        await fetch(`/api/patient/consultations/${activeChatSessionId}/message`, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ text, userId: activeUserId })
-        });
-     } catch(e) {
-        console.error(e);
-     }
+    const input = document.getElementById('patient-chat-input');
+    const text = input.value.trim();
+    if (!text || !activeChatSessionId) return;
+
+    input.value = '';
+    // Optimistically append
+    // appendPatientChatMessage(text, true); 
+
+    try {
+      await fetch(`/api/patient/consultations/${activeChatSessionId}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, userId: activeUserId })
+      });
+    } catch (e) {
+      console.error(e);
+    }
   });
 
   document.getElementById('patient-chat-input').addEventListener('keypress', (e) => {
-     if(e.key === 'Enter') document.getElementById('btn-patient-send-message').click();
+    if (e.key === 'Enter') document.getElementById('btn-patient-send-message').click();
   });
 
   document.getElementById('btn-submit-rating').addEventListener('click', async () => {
     if (!ratingDoctorId) return;
     const rating = document.getElementById('doc-rating-select').value;
-    
+
     await fetch(`/api/patient/rate/${ratingDoctorId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1388,6 +1397,4 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('dash-user-name').textContent = profileData.fullName;
   }
 });
-
-
 

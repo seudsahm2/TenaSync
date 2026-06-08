@@ -411,7 +411,9 @@ class DoctorDashboard {
 
         const appendMsg = (text, isDoctor) => {
           const msgDiv = document.createElement('div');
-          msgDiv.className = `chat-message ${isDoctor ? 'msg-doctor' : 'msg-patient'}`;
+          // Use the global glassmorphism chat-bubble classes instead of legacy ones
+          msgDiv.className = `chat-bubble ${isDoctor ? 'patient' : 'ai'}`;
+          if (isDoctor) msgDiv.style.background = '#3b82f6'; // distinct color for doctor sender
           msgDiv.textContent = text;
           history.appendChild(msgDiv);
           history.scrollTop = history.scrollHeight;
@@ -587,5 +589,4 @@ document.addEventListener('DOMContentLoaded', () => {
 function initDoctorModule() {
   console.log("Doctor module initiated programmatically.");
 }
-
 
